@@ -1,0 +1,25 @@
+{
+    "manifest_version": 3,
+    "name": "Synapse",
+    "version": "0.1.0",
+    "description": "Your private, on-device AI research assistant that transforms web content into interconnected knowledge graphs.",
+    "permissions": [
+        "sidePanel",
+        "activeTab",
+        "scripting"
+    ],
+    "icons": {
+        "16": "icons/icon-16.ico",
+        "48": "icons/icon-48.ico",
+        "128": "icons/icon-128.ico"
+    },
+    "side_panel": {
+        "default_path": "sidepanel.html"
+    },
+    "action": {
+        "default_title": "Open Synapse Side Panel"
+    },
+    "background": {
+        "service_worker": "background.js"
+    }
+}
