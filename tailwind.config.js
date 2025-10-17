@@ -2,8 +2,9 @@
 export default {
 	content: [
 		"./index.html",
-		"./sidepanel.html", // 確保掃描側邊欄的 HTML
-		"./src/**/*.{js,ts,jsx,tsx}", // 掃描所有的 JS/TS/JSX/TSX 檔案
+		"./sidepanel.html", // Ensure scanning side panel HTML
+		"./graph.html", // Include knowledge graph HTML
+		"./src/**/*.{js,ts,jsx,tsx}", // Scan all JS/TS/JSX/TSX files
 	],
 	theme: {
 		extend: {},

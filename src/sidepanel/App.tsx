@@ -27,6 +27,27 @@ function App(): React.JSX.Element {
     const [structuredData, setStructuredData] = useState<StructuredData>({}); // 用於 Key-Value Pairs
     const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
     const [chatInput, setChatInput] = useState<string>("");
+    const chatContainerRef = React.useRef<HTMLDivElement>(null);
+
+    // Auto-scroll to bottom when new messages are added
+    useEffect(() => {
+        if (chatContainerRef.current) {
+            console.log("Auto-scrolling chat container");
+            console.log("Container scrollHeight:", chatContainerRef.current.scrollHeight);
+            console.log("Container clientHeight:", chatContainerRef.current.clientHeight);
+            console.log("Before scroll - scrollTop:", chatContainerRef.current.scrollTop);
+
+            // Use requestAnimationFrame to ensure DOM is updated before scrolling
+            requestAnimationFrame(() => {
+                if (chatContainerRef.current) {
+                    chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+                    console.log("After scroll - scrollTop:", chatContainerRef.current.scrollTop);
+                }
+            });
+        } else {
+            console.log("chatContainerRef.current is null!");
+        }
+    }, [chatMessages]);
 
     // 模擬數據，之後從後端獲取
     const mockPageContent: PageContent = {
@@ -146,30 +167,187 @@ function App(): React.JSX.Element {
         }
     };
 
-    // 處理儲存到資料庫
+    // Auto-create links based on keyword similarity
+    const createAutoLinks = async (currentNodeId: number, currentNodeData: any): Promise<void> => {
+        console.log("Creating auto-links for node:", currentNodeId);
+
+        try {
+            // Get all existing nodes except the current one
+            const allNodes = await db.nodes.toArray();
+            const otherNodes = allNodes.filter(node => node.id !== currentNodeId);
+
+            if (otherNodes.length === 0) {
+                console.log("No other nodes to link with");
+                return;
+            }
+
+            // Extract keywords from current node
+            const currentKeywords = extractKeywords(currentNodeData.summary, currentNodeData.structuredData);
+
+            // Find similar nodes and create links
+            for (const otherNode of otherNodes) {
+                const otherKeywords = extractKeywords(otherNode.summary || '', otherNode.structuredData || {});
+                const similarity = calculateSimilarity(currentKeywords, otherKeywords);
+
+                // Create link if similarity is above threshold (e.g., 0.3)
+                if (similarity > 0.3) {
+                    // Check if link already exists
+                    const existingLink = await db.links
+                        .where('sourceId').equals(currentNodeId)
+                        .and(link => link.targetId === otherNode.id!)
+                        .first();
+
+                    if (!existingLink) {
+                        await db.links.add({
+                            sourceId: currentNodeId,
+                            targetId: otherNode.id!,
+                            reason: `Related topics: ${findCommonKeywords(currentKeywords, otherKeywords).join(', ')}`,
+                            createdAt: new Date()
+                        });
+                        console.log(`Created link: ${currentNodeId} -> ${otherNode.id}`);
+                    }
+                }
+            }
+        } catch (error) {
+            console.error("Error creating auto-links:", error);
+        }
+    };
+
+    // Extract keywords from text and structured data
+    const extractKeywords = (text: string, structuredData: any): Set<string> => {
+        const keywords = new Set<string>();
+
+        // Extract from text (convert to lowercase and split)
+        const words = text.toLowerCase()
+            .replace(/[^\w\s]/g, ' ')
+            .split(/\s+/)
+            .filter(word => word.length > 3); // Only words longer than 3 chars
+
+        words.forEach(word => keywords.add(word));
+
+        // Extract from structured data
+        Object.values(structuredData).forEach(value => {
+            if (typeof value === 'string') {
+                const valueWords = value.toLowerCase()
+                    .replace(/[^\w\s]/g, ' ')
+                    .split(/\s+/)
+                    .filter(word => word.length > 3);
+                valueWords.forEach(word => keywords.add(word));
+            } else if (Array.isArray(value)) {
+                value.forEach(item => {
+                    if (typeof item === 'string') {
+                        const itemWords = item.toLowerCase()
+                            .replace(/[^\w\s]/g, ' ')
+                            .split(/\s+/)
+                            .filter(word => word.length > 3);
+                        itemWords.forEach(word => keywords.add(word));
+                    }
+                });
+            }
+        });
+
+        return keywords;
+    };
+
+    // Calculate similarity between two sets of keywords (Jaccard similarity)
+    const calculateSimilarity = (keywords1: Set<string>, keywords2: Set<string>): number => {
+        const intersection = new Set([...keywords1].filter(k => keywords2.has(k)));
+        const union = new Set([...keywords1, ...keywords2]);
+
+        return union.size > 0 ? intersection.size / union.size : 0;
+    };
+
+    // Find common keywords between two sets
+    const findCommonKeywords = (keywords1: Set<string>, keywords2: Set<string>): string[] => {
+        return [...keywords1].filter(k => keywords2.has(k)).slice(0, 3); // Return top 3 common keywords
+    };
+
+    // Handle saving to knowledge base
     const handleSaveToDatabase = async (): Promise<void> => {
+        console.log("handleSaveToDatabase called");
         setLoadingPhase("saving");
         try {
-            // TODO: Save to Dexie database
-            // await db.pages.add({
-            // 	url: currentPageUrl,
-            // 	title: mockPageContent.title,
-            // 	summary: initialSummary,
-            // 	structuredData: structuredData,
-            // 	chatHistory: chatMessages,
-            // 	createdAt: new Date(),
-            // });
-
-            // Temporarily simulate save
-            setTimeout(() => {
+            // Validate that we have content to save
+            if (!initialSummary || Object.keys(structuredData).length === 0) {
+                console.log("Validation failed: missing summary or structured data");
                 setChatMessages((prev: ChatMessage[]) => [
                     ...prev,
-                    { sender: "ai", text: "Successfully saved to local database!" },
+                    {
+                        sender: "ai",
+                        text: "Please capture page content first and let AI generate summary and structured information."
+                    },
                 ]);
                 setLoadingPhase(null);
-            }, 800);
+                return;
+            }
+
+            console.log("Checking for existing node with URL:", currentPageUrl);
+            // Check if this page already exists in the database
+            const existingNode = await db.nodes.where('url').equalsIgnoreCase(currentPageUrl).first();
+            console.log("Existing node:", existingNode);
+
+            let nodeId: number | undefined;
+
+            const nodeData = {
+                type: 'paper', // Assuming this is a paper; will be changed to dynamic template type later
+                url: currentPageUrl,
+                title: mockPageContent.title || 'Unknown Title', // Temporarily use mock title; will get from getPageContent later
+                summary: initialSummary, // Original AI summary
+                structuredData: structuredData, // Final Key-Value Pairs after AI collaboration
+                chatHistory: chatMessages, // Conversation history
+                createdAt: existingNode ? existingNode.createdAt : new Date(),
+                updatedAt: new Date(),
+            };
+
+            console.log("Node data to save:", nodeData);
+
+            if (existingNode) {
+                // Update existing node
+                console.log("Updating existing node with id:", existingNode.id);
+                await db.nodes.update(existingNode.id!, nodeData);
+                nodeId = existingNode.id!;
+                console.log(`Successfully updated node: ${nodeId}`);
+
+                const successMessage: ChatMessage = { sender: "ai", text: "✅ Successfully updated in knowledge base!" };
+                console.log("Adding success message:", successMessage);
+                setChatMessages((prev: ChatMessage[]) => {
+                    const newMessages = [...prev, successMessage];
+                    console.log("Previous messages count:", prev.length);
+                    console.log("New messages count:", newMessages.length);
+                    console.log("New chat messages:", newMessages);
+                    return newMessages;
+                });
+            } else {
+                // Add new node
+                console.log("Adding new node");
+                nodeId = await db.nodes.add(nodeData);
+                console.log(`Successfully added new node: ${nodeId}`);
+
+                const successMessage: ChatMessage = { sender: "ai", text: "✅ Successfully saved to knowledge base!" };
+                console.log("Adding success message:", successMessage);
+                setChatMessages((prev: ChatMessage[]) => {
+                    const newMessages = [...prev, successMessage];
+                    console.log("Previous messages count:", prev.length);
+                    console.log("New messages count:", newMessages.length);
+                    console.log("New chat messages:", newMessages);
+                    return newMessages;
+                });
+            }
+
+            // Auto-create links with similar nodes
+            if (nodeId) {
+                await createAutoLinks(nodeId, nodeData);
+            }
+
+            console.log("Setting loadingPhase to null");
+            setLoadingPhase(null);
+
+            // (Optional) Automatically open knowledge graph after saving
+            // chrome.tabs.create({ url: 'graph.html' });
+
         } catch (error) {
-            console.error("Save failed:", error);
+            console.error("Save failed with error:", error);
+            console.error("Error stack:", error instanceof Error ? error.stack : "No stack trace");
             const errorMessage = error instanceof Error ? error.message : "Unknown error";
             setChatMessages((prev: ChatMessage[]) => [
                 ...prev,
@@ -194,25 +372,29 @@ function App(): React.JSX.Element {
 
     // 渲染聊天訊息的輔助函數
     const renderChatMessages = (): React.JSX.Element[] => {
-        return chatMessages.map((message, index) => (
-            <div
-                key={index}
-                className={`mb-3 animate-fadeIn ${message.sender === "user" ? "flex justify-end" : "flex justify-start"
-                    }`}
-            >
+        console.log("renderChatMessages called with", chatMessages.length, "messages");
+        return chatMessages.map((message, index) => {
+            console.log(`Rendering message ${index + 1}/${chatMessages.length}:`, message.text.substring(0, 50) + "...");
+            return (
                 <div
-                    className={`max-w-[85%] p-4 rounded-2xl backdrop-blur-sm ${message.sender === "user"
-                        ? "bg-gradient-to-br from-purple-500 to-pink-500 text-white shadow-lg"
-                        : "bg-white/60 text-gray-800 border border-white/30 shadow-md"
+                    key={index}
+                    className={`mb-3 animate-fadeIn ${message.sender === "user" ? "flex justify-end" : "flex justify-start"
                         }`}
                 >
-                    <div className={`text-xs font-semibold mb-1 ${message.sender === "user" ? "text-purple-100" : "text-purple-600"}`}>
-                        {message.sender === "user" ? "You" : "🤖 AI Assistant"}
+                    <div
+                        className={`max-w-[85%] p-4 rounded-2xl backdrop-blur-sm ${message.sender === "user"
+                            ? "bg-gradient-to-br from-purple-500 to-pink-500 text-white shadow-lg"
+                            : "bg-white/60 text-gray-800 border border-white/30 shadow-md"
+                            }`}
+                    >
+                        <div className={`text-xs font-semibold mb-1 ${message.sender === "user" ? "text-purple-100" : "text-purple-600"}`}>
+                            {message.sender === "user" ? "You" : "🤖 AI Assistant"}
+                        </div>
+                        <div className="text-sm leading-relaxed">{message.text}</div>
                     </div>
-                    <div className="text-sm leading-relaxed">{message.text}</div>
                 </div>
-            </div>
-        ));
+            );
+        });
     };
 
     return (
@@ -317,8 +499,15 @@ function App(): React.JSX.Element {
                         </svg>
                         <h3 className="text-lg font-bold text-gray-800">Chat with AI</h3>
                     </div>
-                    <div className="bg-white/40 backdrop-blur-sm rounded-2xl border border-white/30 shadow-lg p-4 max-h-80 overflow-y-auto space-y-2">
-                        {renderChatMessages()}
+                    <div
+                        ref={chatContainerRef}
+                        className="bg-white/40 backdrop-blur-sm rounded-2xl border border-white/30 shadow-lg p-4 max-h-80 overflow-y-auto space-y-2 scroll-smooth"
+                    >
+                        {(() => {
+                            const messages = renderChatMessages();
+                            console.log("Actually rendering", messages.length, "message elements in DOM");
+                            return messages;
+                        })()}
                         {loadingPhase === "chatting" && (
                             <div className="flex items-center justify-center gap-2 text-purple-600 text-sm py-4">
                                 <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
@@ -365,17 +554,48 @@ function App(): React.JSX.Element {
             {initialSummary && (
                 <div className="mb-6">
                     <button
-                        onClick={handleSaveToDatabase}
+                        onClick={() => {
+                            console.log("Save button clicked!");
+                            handleSaveToDatabase();
+                        }}
                         disabled={loadingPhase !== null}
                         className="w-full bg-white/60 backdrop-blur-md hover:bg-white/80 disabled:bg-gray-300/60 border border-purple-200 text-purple-700 font-semibold py-3 px-6 rounded-2xl transition-all duration-300 shadow-lg hover:shadow-xl disabled:shadow-none transform hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2"
                     >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
-                        </svg>
-                        <span>{loadingPhase === "saving" ? "Saving..." : "Save to Database"}</span>
+                        {loadingPhase === "saving" ? (
+                            <>
+                                <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                <span>Saving...</span>
+                            </>
+                        ) : (
+                            <>
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                                </svg>
+                                <span>Save to Knowledge Base</span>
+                            </>
+                        )}
                     </button>
                 </div>
             )}
+
+            {/* 查看知識圖譜按鈕 */}
+            <div className="mb-6">
+                <button
+                    onClick={() => {
+                        console.log("Opening knowledge graph...");
+                        chrome.tabs.create({ url: chrome.runtime.getURL('graph.html') });
+                    }}
+                    className="w-full bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-semibold py-3 px-6 rounded-2xl transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2"
+                >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                    </svg>
+                    <span>View Knowledge Graph</span>
+                </button>
+            </div>
 
             {/* Footer */}
             <div className="text-center text-xs text-gray-500 mt-8 space-y-1">
