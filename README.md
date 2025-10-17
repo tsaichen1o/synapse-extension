@@ -69,23 +69,17 @@ To use Gemini Nano in Chrome:
 
 2. **Install dependencies**
    ```bash
-   npm install
-   # or
    yarn install
    ```
 
 3. **Start development server** (optional, for testing)
    ```bash
-   npm run dev
-   # or
    yarn dev
    ```
    Visit `http://localhost:5173/sidepanel.html` to preview the UI
 
 4. **Build the extension**
    ```bash
-   npm run build
-   # or
    yarn build
    ```
    This creates a `dist/` folder with the compiled extension
