@@ -2,14 +2,16 @@ import React, { useState, useEffect } from "react";
 import { db } from "../lib/db"; // 假設你已經有了 db.js，否則需要先創建
 import {
     getPageContent,
-    summarizeWithGemini,
-    chatWithGemini,
+    summarizeContentWithAI,
+    chatWithAI,
     extractKeyValuePairs,
+} from "../lib/ai";
+import {
     PageContent,
     StructuredData,
     SummaryResponse,
     ChatResponse,
-} from "../lib/ai";
+} from "../lib/types";
 
 // Type definitions for component state
 interface ChatMessage {
@@ -118,7 +120,7 @@ function App(): React.JSX.Element {
 
         try {
             // TODO: Actually implement conversation with Gemini Nano
-            // const aiResponse = await chatWithGemini(
+            // const aiResponse = await chatWithAI(
             // 	mockPageContent,
             // 	initialSummary,
             // 	structuredData,
