@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from "react";
-import { db } from "../lib/db"; // 假設你已經有了 db.js，否則需要先創建
+import { db } from "../lib/db";
 import {
-    getPageContent,
-    summarizeWithGemini,
-    chatWithGemini,
-    extractKeyValuePairs,
+    summarizeContentWithAI,
+    chatWithAI,
+} from "../lib/ai";
+import {
     PageContent,
     StructuredData,
     SummaryResponse,
     ChatResponse,
-} from "../lib/ai";
+} from "../lib/types";
+import { extractPageContentFromDOM } from "../lib/extractor";
 
 // Type definitions for component state
 interface ChatMessage {
@@ -90,29 +91,21 @@ function App(): React.JSX.Element {
         setChatMessages([]);
 
         try {
-            // TODO: Actually fetch page content (will be implemented in Phase 3)
-            // const pageContent = await getPageContent();
-            const pageContent = mockPageContent; // Temporarily use mock data
-
+            const pageContent = extractPageContentFromDOM();
+            
             setLoadingPhase("summarizing");
-            // TODO: Call Gemini Nano for initial summarization and Key-Value Pair extraction
-            // const aiResult = await summarizeAndExtract(pageContent);
-            // setInitialSummary(aiResult.summary);
-            // setStructuredData(aiResult.structuredData);
-
-            // Temporarily use mock data
-            setTimeout(() => {
-                setInitialSummary(mockAiSummary);
-                setStructuredData(mockStructuredData);
-                setChatMessages([
-                    {
-                        sender: "ai",
-                        text: `I have captured and summarized the page content. Here is the generated structured information:`,
-                    },
-                    { sender: "ai", text: `Summary: "${mockAiSummary}"` },
-                ]);
-                setLoadingPhase(null);
-            }, 1500);
+            const result = await summarizeContentWithAI(pageContent);
+            
+            setInitialSummary(result.summary);
+            setStructuredData(result.structuredData);
+            setChatMessages([
+                {
+                    sender: "ai",
+                    text: `I have captured and summarized the page content. Here is the generated structured information:`,
+                },
+                { sender: "ai", text: `Summary: "${result.summary}"` },
+            ]);
+            setLoadingPhase(null);
         } catch (error) {
             console.error("Capture or summarization failed:", error);
             const errorMessage = error instanceof Error ? error.message : "Unknown error";
@@ -139,7 +132,7 @@ function App(): React.JSX.Element {
 
         try {
             // TODO: Actually implement conversation with Gemini Nano
-            // const aiResponse = await chatWithGemini(
+            // const aiResponse = await chatWithAI(
             // 	mockPageContent,
             // 	initialSummary,
             // 	structuredData,
