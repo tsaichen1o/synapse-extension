@@ -4,6 +4,7 @@ import {
     summarizeContentWithAI,
     chatWithAI,
 } from "../lib/ai";
+import { getPageContent } from "../lib/helper";
 import {
     PageContent,
     StructuredData,
@@ -91,8 +92,9 @@ function App(): React.JSX.Element {
         setChatMessages([]);
 
         try {
-            const pageContent = extractPageContentFromDOM();
-            
+            // const pageContent = extractPageContentFromDOM();
+            // pass the current page URL (fallback to mock) to the PDF extractor
+            const pageContent = await getPageContent();
             setLoadingPhase("summarizing");
             const result = await summarizeContentWithAI(pageContent);
             
