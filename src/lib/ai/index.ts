@@ -1,14 +1,15 @@
+export { AI } from './ai';
+export { getPageContent } from '../helper';
+export { summarizeContentWithAI } from './summarize';
+export { chatWithAI } from './chat';
+
 import type {
     AILanguageModel,
     AIModelAvailability,
 } from '../types';
-import { getPageContent } from '../helper';
-import { summarizeContentWithAI } from './summarize';
-import { extractKeyValuePairs } from '../extractor/content-extractor';
-import { chatWithAI } from './chat';
 
 /**
- * Check if Chrome Built-in AI (Gemini Nano) is available
+ * Check if Chrome Built-in AI is available.
  */
 export async function isAIAvailable(): Promise<boolean> {
     if (!window.LanguageModel) {
@@ -34,7 +35,6 @@ if (!window.LanguageModel) {
     console.warn("3. Enable chrome://flags/#prompt-api-for-gemini-nano");
     console.warn("4. Ensure your device meets system requirements (22GB free space or 4GB+ VRAM)");
 
-    // Create a basic mock for development
     const mockLanguageModel: AILanguageModel = {
         availability: async () => "available" as AIModelAvailability,
         params: async () => ({
@@ -47,7 +47,6 @@ if (!window.LanguageModel) {
             return {
                 prompt: async (text: string): Promise<string> => {
                     console.log("Mock prompt called with:", text.substring(0, 100) + "...");
-                    // Return a mock JSON response that matches expected format
                     return JSON.stringify({
                         summary: "這是一個模擬的摘要回應。請啟用真實的 Chrome Built-in AI 來獲得實際功能。",
                         structuredData: {
@@ -74,15 +73,4 @@ if (!window.LanguageModel) {
 
     window.LanguageModel = mockLanguageModel;
 }
-
-// Export the new recommended API
-export { AI as GeminiAI } from './ai';
-
-// Export utility functions
-export {
-    getPageContent,
-    summarizeContentWithAI,
-    chatWithAI,
-    extractKeyValuePairs,
-};
 
