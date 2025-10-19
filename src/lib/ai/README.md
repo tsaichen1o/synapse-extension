@@ -111,7 +111,7 @@ The APIs are in active discussion and **subject to change**. Development agents 
 
 Performance notes from early testing indicate that the Prompt API can sometimes silently fail or hang on longer or structured prompts, and memory usage can occasionally spike, causing temporary slowdowns. Focusing on **session management** best practices is recommended for optimal performance.
 
-# Integration
+## Integration
 
 The foundational concept for using the Prompt API, Summarizer API, Writer API, Rewriter API, and Proofreader API is managing the session using the `LanguageModel` interface, which uses the **Gemini Nano** model running client-side.
 

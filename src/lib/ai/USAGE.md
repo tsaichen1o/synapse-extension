@@ -44,10 +44,8 @@
 
 在 Chrome 中訪問以下網址並啟用這些功能:
 
-```
-chrome://flags/#optimization-guide-on-device-model
-chrome://flags/#prompt-api-for-gemini-nano
-```
+- chrome://flags/#optimization-guide-on-device-model
+- chrome://flags/#prompt-api-for-gemini-nano
 
 將兩個選項都設置為 **"Enabled"**,然後重啟 Chrome。
 

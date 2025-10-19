@@ -7,190 +7,140 @@ import {
 } from '../types';
 
 /**
- * Advanced session management utilities for Chrome Built-in AI (Gemini Nano)
- * Provides helpers for streaming responses, structured output, and session lifecycle management.
+ * GeminiAI - A wrapper class for Chrome Built-in AI (Gemini Nano)
+ * Provides convenient methods for interacting with the on-device AI model
  */
+export class GeminiAI {
+    private nativeSession: AILanguageModelSession;
 
-/**
- * Create an AI session with custom parameters and initial context
- */
-export async function createAdvancedSession(options?: {
-    temperature?: number;
-    topK?: number;
-    systemPrompt?: string;
-}): Promise<AILanguageModelSession> {
-    if (!window.LanguageModel) {
-        throw new Error("LanguageModel API is not available");
+    private constructor(session: AILanguageModelSession) {
+        this.nativeSession = session;
     }
 
-    const params = await window.LanguageModel.params();
-
-    const createOptions: AILanguageModelCreateOptions = {
-        temperature: options?.temperature ?? params.defaultTemperature,
-        topK: options?.topK ?? params.defaultTopK,
-    };
-
-    // Add system prompt if provided
-    if (options?.systemPrompt) {
-        createOptions.initialPrompts = [
-            {
-                role: "system",
-                content: options.systemPrompt,
-            },
-        ];
-    }
-
-    return await window.LanguageModel.create(createOptions);
-}
-
-/**
- * Get a streaming response from the AI with a callback for each chunk
- */
-export async function promptWithStreaming(
-    session: AILanguageModelSession,
-    prompt: string,
-    onChunk: (chunk: string) => void
-): Promise<string> {
-    const stream = session.promptStreaming(prompt);
-    const reader = stream.getReader();
-    let fullResponse = "";
-
-    try {
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-
-            fullResponse += value;
-            onChunk(value);
-        }
-    } finally {
-        reader.releaseLock();
-    }
-
-    return fullResponse;
-}
-
-/**
- * Get structured JSON output from the AI using JSON Schema constraint
- */
-export async function promptWithStructuredOutput<T = any>(
-    session: AILanguageModelSession,
-    prompt: string,
-    schema: object
-): Promise<T> {
-    const result = await session.prompt(prompt, {
-        responseConstraint: {
-            type: "json-schema",
-            schema: schema,
-        },
-    });
-
-    return JSON.parse(result) as T;
-}
-
-/**
- * Check session resource usage
- */
-export function checkSessionUsage(session: AILanguageModelSession): {
-    usage: number;
-    quota: number;
-    percentUsed: number;
-} {
-    const usage = session.inputUsage ?? 0;
-    const quota = session.inputQuota ?? 0;
-    const percentUsed = quota > 0 ? (usage / quota) * 100 : 0;
-
-    return { usage, quota, percentUsed };
-}
-
-/**
- * Clone a session to reset context while keeping initial prompts
- */
-export async function resetSessionContext(
-    session: AILanguageModelSession
-): Promise<AILanguageModelSession> {
-    return await session.clone();
-}
-
-/**
- * Session pool manager to reuse sessions efficiently
- */
-export class AISessionPool {
-    private sessions: AILanguageModelSession[] = [];
-    private readonly maxSessions: number;
-
-    constructor(maxSessions: number = 3) {
-        this.maxSessions = maxSessions;
-    }
-
-    async getSession(options?: {
+    /**
+     * Create a new GeminiAI instance with custom parameters
+     */
+    static async create(options?: {
         temperature?: number;
         topK?: number;
         systemPrompt?: string;
-    }): Promise<AILanguageModelSession> {
-        // Reuse existing session if available
-        if (this.sessions.length > 0) {
-            const session = this.sessions.pop()!;
-            // Check if session is still usable
-            const { percentUsed } = checkSessionUsage(session);
-            if (percentUsed < 80) {
-                return session;
-            } else {
-                session.destroy();
+    }): Promise<GeminiAI> {
+        if (!window.LanguageModel) {
+            throw new Error("LanguageModel API is not available");
+        }
+
+        const params = await window.LanguageModel.params();
+
+        const createOptions: AILanguageModelCreateOptions = {
+            temperature: options?.temperature ?? params.defaultTemperature,
+            topK: options?.topK ?? params.defaultTopK,
+        };
+
+        // Add system prompt if provided
+        if (options?.systemPrompt) {
+            createOptions.initialPrompts = [
+                {
+                    role: "system",
+                    content: options.systemPrompt,
+                },
+            ];
+        }
+
+        const session = await window.LanguageModel.create(createOptions);
+        return new GeminiAI(session);
+    }
+
+    /**
+     * Send a prompt and get the complete response
+     */
+    async prompt(text: string): Promise<string> {
+        return await this.nativeSession.prompt(text);
+    }
+
+    /**
+     * Send a prompt and get a streaming response
+     */
+    async promptStreaming(
+        prompt: string,
+        onChunk: (chunk: string) => void
+    ): Promise<string> {
+        const stream = this.nativeSession.promptStreaming(prompt);
+        const reader = stream.getReader();
+        let fullResponse = "";
+
+        try {
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                fullResponse += value;
+                onChunk(value);
             }
+        } finally {
+            reader.releaseLock();
         }
 
-        // Create new session
-        return await createAdvancedSession(options);
+        return fullResponse;
     }
 
-    releaseSession(session: AILanguageModelSession): void {
-        if (this.sessions.length < this.maxSessions) {
-            this.sessions.push(session);
-        } else {
-            session.destroy();
-        }
+    /**
+     * Send a prompt and get structured JSON output using JSON Schema
+     */
+    async promptStructured<T = any>(
+        prompt: string,
+        schema: object
+    ): Promise<T> {
+        const result = await this.nativeSession.prompt(prompt, {
+            responseConstraint: {
+                type: "json-schema",
+                schema: schema,
+            },
+        });
+
+        return JSON.parse(result) as T;
     }
 
-    destroyAll(): void {
-        for (const session of this.sessions) {
-            session.destroy();
-        }
-        this.sessions = [];
-    }
-}
+    /**
+     * Get current resource usage information
+     */
+    getUsage(): {
+        usage: number;
+        quota: number;
+        percentUsed: number;
+    } {
+        const usage = this.nativeSession.inputUsage ?? 0;
+        const quota = this.nativeSession.inputQuota ?? 0;
+        const percentUsed = quota > 0 ? (usage / quota) * 100 : 0;
 
-/**
- * Download progress monitor for AI model
- */
-export async function waitForModelReady(
-    onProgress?: (status: AIModelAvailability) => void,
-    maxWaitMs: number = 60000
-): Promise<boolean> {
-    if (!window.LanguageModel) {
-        return false;
+        return { usage, quota, percentUsed };
     }
 
-    const startTime = Date.now();
-
-    while (Date.now() - startTime < maxWaitMs) {
-        const availability = await window.LanguageModel.availability();
-
-        if (onProgress) {
-            onProgress(availability);
-        }
-
-        if (availability === "available") {
-            return true;
-        }
-
-        if (availability === "unavailable") {
-            return false;
-        }
-
-        // Wait before checking again
-        await new Promise(resolve => setTimeout(resolve, 1000));
+    /**
+     * Check if resource usage is above a threshold
+     */
+    isUsageHigh(threshold: number = 80): boolean {
+        return this.getUsage().percentUsed >= threshold;
     }
 
-    return false;
+    /**
+     * Clone this instance to reset context while keeping initial configuration
+     */
+    async clone(): Promise<GeminiAI> {
+        const clonedSession = await this.nativeSession.clone();
+        return new GeminiAI(clonedSession);
+    }
+
+    /**
+     * Release resources used by this instance
+     */
+    destroy(): void {
+        this.nativeSession.destroy();
+    }
+
+    /**
+     * Get the underlying native session for advanced use cases
+     */
+    getNativeSession(): AILanguageModelSession {
+        return this.nativeSession;
+    }
 }
