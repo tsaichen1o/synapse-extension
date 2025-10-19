@@ -71,6 +71,18 @@ export interface AILanguageModelCreateOptions {
     }>;
     /** Signal to abort session creation */
     signal?: AbortSignal;
+    /** Expected input types and languages */
+    expectedInputs?: Array<{
+        type: "text" | "image" | "audio";
+        /** Supported languages: "en", "ja", "es" (from Chrome 140+) */
+        languages?: Array<"en" | "ja" | "es">;
+    }>;
+    /** Expected output types and languages */
+    expectedOutputs?: Array<{
+        type: "text" | "image" | "audio";
+        /** Supported languages: "en", "ja", "es" (from Chrome 140+) */
+        languages?: Array<"en" | "ja" | "es">;
+    }>;
 }
 
 /**

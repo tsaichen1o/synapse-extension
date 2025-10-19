@@ -32,8 +32,21 @@ export class AI {
         const createOptions: AILanguageModelCreateOptions = {
             temperature: options?.temperature ?? params.defaultTemperature,
             topK: options?.topK ?? params.defaultTopK,
+            expectedInputs: [
+                {
+                    type: "text",
+                    languages: ["en"],
+                },
+            ],
+            expectedOutputs: [
+                {
+                    type: "text",
+                    languages: ["en"],
+                },
+            ],
         };
-
+        // TODO: Remove
+        console.log("Creating AI session with options:", createOptions);
         // Add system prompt if provided
         if (options?.systemPrompt) {
             createOptions.initialPrompts = [
