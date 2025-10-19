@@ -1,6 +1,6 @@
 import { PageContent, StructuredData, ChatResponse } from '../types';
 import { getChatPrompt } from './prompt/chat';
-import { createAISession } from './index';
+import { AI } from './ai';
 
 /**
  * Interactive chat with Chrome Built-in AI (Gemini Nano) for refining summaries 
@@ -13,8 +13,12 @@ export async function chatWithAI(
     userMessage: string
 ): Promise<ChatResponse> {
     try {
-        // Create a new AI session using the LanguageModel API
-        const session = await createAISession();
+        // Create a GeminiAI instance with settings optimized for conversational refinement
+        const ai = await AI.create({
+            temperature: 0.8,
+            topK: 50,
+            systemPrompt: 'You are a helpful assistant that refines content summaries and structured data based on user feedback.'
+        });
 
         const promptText = getChatPrompt(
             pageContent,
@@ -24,12 +28,10 @@ export async function chatWithAI(
         );
 
         // Get the AI response
-        const result = await session.prompt(promptText);
+        const result = await ai.prompt(promptText);
 
-        // Clean up the session
-        if (session.destroy) {
-            session.destroy();
-        }
+        // Clean up the AI instance
+        ai.destroy();
 
         try {
             const jsonResult = JSON.parse(result);

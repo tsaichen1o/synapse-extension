@@ -1,10 +1,6 @@
-/// <reference path="../global.d.ts" />
-
-import {
-    AISession,
+import type {
     AILanguageModel,
     AIModelAvailability,
-    AILanguageModelSession
 } from '../types';
 import { getPageContent } from '../helper';
 import { summarizeContentWithAI } from './summarize';
@@ -27,55 +23,6 @@ export async function isAIAvailable(): Promise<boolean> {
     } catch (error) {
         console.error("Error checking AI availability:", error);
         return false;
-    }
-}
-
-/**
- * Create an AI session using the Chrome Built-in AI (Gemini Nano)
- * This function handles model downloading if necessary (requires user interaction)
- */
-export async function createAISession(): Promise<AISession> {
-    if (!window.LanguageModel) {
-        throw new Error("LanguageModel API is not available. Please use Chrome 138+ with Built-in AI enabled.");
-    }
-
-    const availability = await window.LanguageModel.availability();
-
-    if (availability === "unavailable") {
-        throw new Error("AI model is unavailable on this device. Please check system requirements.");
-    }
-
-    if (availability === "downloadable") {
-        console.log("AI model needs to be downloaded. This requires user interaction.");
-        // TODO: In a real extension, you should trigger this from a user action (button click)
-        // The create() call will fail if not triggered by user interaction
-    }
-
-    if (availability === "downloading") {
-        console.log("AI model is currently downloading. Please wait...");
-        // TODO: You might want to poll or wait here in a production app
-    }
-
-    try {
-        const session = await window.LanguageModel.create({
-            temperature: 0.7,  // Balanced creativity
-            topK: 40,          // Good diversity
-        });
-
-        console.log("AI session created successfully");
-
-        // Wrap the native session to match our AISession interface
-        return {
-            prompt: async (text: string): Promise<string> => {
-                return await session.prompt(text);
-            },
-            destroy: () => {
-                session.destroy();
-            }
-        };
-    } catch (error) {
-        console.error("Failed to create AI session:", error);
-        throw new Error(`Failed to create AI session: ${error instanceof Error ? error.message : String(error)}`);
     }
 }
 
@@ -128,6 +75,10 @@ if (!window.LanguageModel) {
     window.LanguageModel = mockLanguageModel;
 }
 
+// Export the new recommended API
+export { AI as GeminiAI } from './ai';
+
+// Export utility functions
 export {
     getPageContent,
     summarizeContentWithAI,

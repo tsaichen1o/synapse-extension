@@ -1,16 +1,14 @@
-/// <reference path="../global.d.ts" />
-
-import {
-    AILanguageModelSession,
+import type {
     AILanguageModelCreateOptions,
-    AIModelAvailability,
+    AILanguageModelPromptOptions,
+    AILanguageModelSession,
 } from '../types';
 
 /**
  * GeminiAI - A wrapper class for Chrome Built-in AI (Gemini Nano)
  * Provides convenient methods for interacting with the on-device AI model
  */
-export class GeminiAI {
+export class AI {
     private nativeSession: AILanguageModelSession;
 
     private constructor(session: AILanguageModelSession) {
@@ -24,7 +22,7 @@ export class GeminiAI {
         temperature?: number;
         topK?: number;
         systemPrompt?: string;
-    }): Promise<GeminiAI> {
+    }): Promise<AI> {
         if (!window.LanguageModel) {
             throw new Error("LanguageModel API is not available");
         }
@@ -47,7 +45,7 @@ export class GeminiAI {
         }
 
         const session = await window.LanguageModel.create(createOptions);
-        return new GeminiAI(session);
+        return new AI(session);
     }
 
     /**
@@ -125,9 +123,9 @@ export class GeminiAI {
     /**
      * Clone this instance to reset context while keeping initial configuration
      */
-    async clone(): Promise<GeminiAI> {
+    async clone(): Promise<AI> {
         const clonedSession = await this.nativeSession.clone();
-        return new GeminiAI(clonedSession);
+        return new AI(clonedSession);
     }
 
     /**

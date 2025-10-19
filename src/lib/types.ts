@@ -1,7 +1,55 @@
 /**
- * Chrome Built-in AI (Gemini Nano) Type Definitions
- * Based on the experimental Prompt API available in Chrome 138+.
+ * Application-specific type definitions for Synapse Extension
+ *
+ * Note: Chrome Built-in AI (Gemini Nano) type definitions is based on
+ * https://developer.chrome.com/docs/ai/built-in
  */
+
+// Page Content Types
+export interface PageContent {
+    /** Page title, typically document.title */
+    title: string;
+    /** Page URL */
+    url: string;
+    /** A short content snippet or initial paragraphs suitable for summarization */
+    content?: string;
+    /** Optional abstract-like summary if extracted by other means */
+    abstract?: string;
+    /** Full text content extracted from the main page area */
+    fullText: string;
+    /** meta[name="description"] content, if available */
+    metaDescription?: string;
+    /** Array of heading texts (h1..h6) found on the page */
+    headings?: string[];
+    /** Top outbound links found on the page (limited when extracted) */
+    links?: string[];
+    /** Image URLs extracted from the page */
+    images?: string[];
+}
+
+// Type definitions for structured data
+export interface StructuredData {
+    /**
+     * A flexible map for extracted key/value pairs. Values are intentionally
+     * permissive to allow strings, arrays, numbers, booleans, or nested objects.
+     */
+    [key: string]: string | string[] | number | boolean | object;
+}
+
+// Type definitions for AI responses
+export interface SummaryResponse {
+    /** Human-readable summary text (usually Chinese for this project) */
+    summary: string;
+    /** Structured key/value pairs extracted from the page */
+    structuredData: StructuredData;
+}
+
+export interface ChatResponse extends SummaryResponse {
+    /** A user-facing conversational response from the AI in addition to the structured data */
+    aiResponse: string;
+}
+
+// --- Chrome Built-in AI Type Definitions (DO NOT EDIT) ---
 
 /**
  * Availability status of the language model
@@ -95,69 +143,4 @@ export interface AILanguageModel {
      * Requires user interaction if model needs to be downloaded
      */
     create(options?: AILanguageModelCreateOptions): Promise<AILanguageModelSession>;
-}
-
-/**
- * Represents a single AI session created from the platform's AI API (e.g., Gemini Nano).
- * This is a simplified wrapper around AILanguageModelSession for internal use.
- * @deprecated Consider using AILanguageModelSession directly from window.LanguageModel
- */
-export interface AISession {
-    /**
-     * Send a textual prompt to the AI session and receive the response as a string.
-     * @param text - The prompt text to send to the AI model.
-     * @returns A Promise that resolves to the AI model's string output. This output
-     *          may be a plain text reply or a JSON-encoded string depending on the prompt.
-     */
-    prompt(text: string): Promise<string>;
-
-    /**
-     * Optional cleanup method. Call if the underlying AI session requires explicit
-     * resource release. Not all environments provide this.
-     */
-    destroy?(): void;
-}
-
-// Type definitions for page content
-export interface PageContent {
-    /** Page title, typically document.title */
-    title: string;
-    /** Page URL */
-    url: string;
-    /** A short content snippet or initial paragraphs suitable for summarization */
-    content?: string;
-    /** Optional abstract-like summary if extracted by other means */
-    abstract?: string;
-    /** Full text content extracted from the main page area */
-    fullText: string;
-    /** meta[name="description"] content, if available */
-    metaDescription?: string;
-    /** Array of heading texts (h1..h6) found on the page */
-    headings?: string[];
-    /** Top outbound links found on the page (limited when extracted) */
-    links?: string[];
-    /** Image URLs extracted from the page */
-    images?: string[];
-}
-
-// Type definitions for structured data
-export interface StructuredData {
-    /**
-     * A flexible map for extracted key/value pairs. Values are intentionally
-     * permissive to allow strings, arrays, numbers, booleans, or nested objects.
-     */
-    [key: string]: string | string[] | number | boolean | object;
-}
-
-// Type definitions for AI responses
-export interface SummaryResponse {
-    /** Human-readable summary text (usually Chinese for this project) */
-    summary: string;
-    /** Structured key/value pairs extracted from the page */
-    structuredData: StructuredData;
-}
-
-export interface ChatResponse extends SummaryResponse {
-    /** A user-facing conversational response from the AI in addition to the structured data */
-    aiResponse: string;
 }
