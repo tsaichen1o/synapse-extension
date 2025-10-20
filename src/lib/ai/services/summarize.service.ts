@@ -20,7 +20,7 @@ URL: ${pageContent.url}
 Description: ${pageContent.metaDescription || "None"}
 
 ## Main Content:
-${pageContent.content || pageContent.abstract || pageContent.fullText.substring(0, 2000)}
+${pageContent.content || pageContent.abstract || pageContent.fullText}
 
 ## Heading Structure:
 ${pageContent.headings?.slice(0, 10).join(', ') || "None"}

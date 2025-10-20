@@ -26,7 +26,7 @@ This is a web page content analysis tool. You are conversing with a user to help
 Title: ${pageContent.title}
 Excerpt: ${pageContent.content ||
             pageContent.abstract ||
-            pageContent.fullText.substring(0, 1000)
+            pageContent.fullText
             }
 
 ## Current Summary:
@@ -79,14 +79,14 @@ Based on the user's message, update the summary and structured information. The 
                 return {
                     summary: jsonResult.summary,
                     structuredData: jsonResult.structuredData,
-                    aiResponse: jsonResult.aiResponse || "好的,我已嘗試根據您的指示進行調整。",
+                    aiResponse: jsonResult.aiResponse || "I have updated the information based on your instructions.",
                 };
             } catch (e) {
-                console.error("無法解析 AI 的對話 JSON 回應:", result, e);
+                console.error("Unable to parse AI conversational JSON response:", result, e);
                 return {
                     summary: currentSummary,
                     structuredData: currentStructuredData,
-                    aiResponse: "抱歉,我無法理解您的指令或解析我的回應。請再試一次。",
+                    aiResponse: "Sorry, I couldn't understand your instruction or parse my response. Please try again.",
                 };
             }
         } catch (error) {
@@ -94,7 +94,7 @@ Based on the user's message, update the summary and structured information. The 
             return {
                 summary: currentSummary,
                 structuredData: currentStructuredData,
-                aiResponse: `發生錯誤: ${error instanceof Error ? error.message : String(error)}`,
+                aiResponse: `Error: ${error instanceof Error ? error.message : String(error)}`,
             };
         }
     }
