@@ -44,8 +44,14 @@ export class AI {
                     languages: ["en"],
                 },
             ],
+            monitor(m) {
+                m.addEventListener('downloadprogress', (e) => {
+                    // @ts-ignore
+                    console.log(`Downloaded ${e.loaded * 100}%`);
+                });
+            },
         };
-        // TODO: Remove
+
         console.log("Creating AI session with options:", createOptions);
         // Add system prompt if provided
         if (options?.systemPrompt) {
