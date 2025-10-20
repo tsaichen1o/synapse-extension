@@ -191,6 +191,7 @@ export class AI {
      * Delegates to SummarizeService
      */
     async summarize(pageContent: PageContent): Promise<SummaryResponse> {
+        this.reset();
         return this.summarizeService.summarize(pageContent);
     }
 
