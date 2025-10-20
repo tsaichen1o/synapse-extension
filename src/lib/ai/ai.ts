@@ -161,6 +161,18 @@ export class AI {
     }
 
     /**
+     * Reset the current session by cloning it
+     * This clears conversation history while keeping the initial configuration
+     */
+    async reset(): Promise<void> {
+        const oldSession = this.nativeSession;
+        const clonedSession = await this.nativeSession.clone();
+        this.nativeSession = clonedSession;
+        oldSession.destroy();
+        console.log("AI session has been reset (conversation history cleared)");
+    }
+
+    /**
      * Release resources used by this instance
      */
     destroy(): void {
