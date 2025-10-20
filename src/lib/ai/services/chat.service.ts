@@ -1,5 +1,6 @@
 import { PageContent, StructuredData, ChatResponse } from '../../types';
 import type { AI } from '../ai';
+import { parseAIJSON } from './utils';
 
 /**
  * Chat service that uses an AI instance
@@ -75,7 +76,7 @@ Based on the user's message, update the summary and structured information. The 
             const result = await this.ai.prompt(promptText);
 
             try {
-                const jsonResult = JSON.parse(result);
+                const jsonResult = parseAIJSON<ChatResponse>(result);
                 return {
                     summary: jsonResult.summary,
                     structuredData: jsonResult.structuredData,

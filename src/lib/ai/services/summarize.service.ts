@@ -1,5 +1,6 @@
 import { PageContent, SummaryResponse } from '../../types';
 import type { AI } from '../ai';
+import { parseAIJSON } from './utils';
 
 /**
  * Summarization service that uses an AI instance
@@ -51,7 +52,7 @@ Return the results in the following JSON format, ensuring the summary is in the 
             const result = await this.ai.prompt(promptText);
 
             try {
-                const jsonResult: SummaryResponse = JSON.parse(result);
+                const jsonResult: SummaryResponse = parseAIJSON<SummaryResponse>(result);
                 return {
                     summary: jsonResult.summary,
                     structuredData: jsonResult.structuredData,
