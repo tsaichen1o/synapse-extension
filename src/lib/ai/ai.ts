@@ -7,8 +7,7 @@ import type {
     SummaryResponse,
     ChatResponse,
 } from '../types';
-import { getSummarizationPrompt } from './prompt/summarization';
-import { getChatPrompt } from './prompt/chat';
+import { SummarizeService, ChatService } from './services';
 
 /**
  * GeminiAI - A wrapper class for Chrome Built-in AI (Gemini Nano)
@@ -17,8 +16,16 @@ import { getChatPrompt } from './prompt/chat';
 export class AI {
     private nativeSession: AILanguageModelSession;
 
+    // Services for different AI functionalities
+    public readonly summarizeService: SummarizeService;
+    public readonly chatService: ChatService;
+
     private constructor(session: AILanguageModelSession) {
         this.nativeSession = session;
+
+        // Initialize services
+        this.summarizeService = new SummarizeService(this);
+        this.chatService = new ChatService(this);
     }
 
     /**
@@ -169,34 +176,15 @@ export class AI {
 
     /**
      * Summarize page content using AI
+     * Delegates to SummarizeService
      */
     async summarize(pageContent: PageContent): Promise<SummaryResponse> {
-        try {
-            const promptText = getSummarizationPrompt(pageContent);
-            const result = await this.prompt(promptText);
-
-            try {
-                const jsonResult: SummaryResponse = JSON.parse(result);
-                return {
-                    summary: jsonResult.summary,
-                    structuredData: jsonResult.structuredData,
-                };
-            } catch (e) {
-                console.error("Unable to parse JSON response from AI:", result, e);
-                // Return the raw response as summary if JSON parsing fails
-                return {
-                    summary: result,
-                    structuredData: {},
-                };
-            }
-        } catch (error) {
-            console.error("Error in summarize:", error);
-            throw new Error(`Failed to summarize content: ${error instanceof Error ? error.message : String(error)}`);
-        }
+        return this.summarizeService.summarize(pageContent);
     }
 
     /**
      * Chat with AI to refine summaries and structured data
+     * Delegates to ChatService
      */
     async chat(
         pageContent: PageContent,
@@ -204,38 +192,6 @@ export class AI {
         currentStructuredData: StructuredData,
         userMessage: string
     ): Promise<ChatResponse> {
-        try {
-            const promptText = getChatPrompt(
-                pageContent,
-                currentSummary,
-                currentStructuredData,
-                userMessage
-            );
-
-            const result = await this.prompt(promptText);
-
-            try {
-                const jsonResult = JSON.parse(result);
-                return {
-                    summary: jsonResult.summary,
-                    structuredData: jsonResult.structuredData,
-                    aiResponse: jsonResult.aiResponse || "好的,我已嘗試根據您的指示進行調整。",
-                };
-            } catch (e) {
-                console.error("無法解析 AI 的對話 JSON 回應:", result, e);
-                return {
-                    summary: currentSummary,
-                    structuredData: currentStructuredData,
-                    aiResponse: "抱歉,我無法理解您的指令或解析我的回應。請再試一次。",
-                };
-            }
-        } catch (error) {
-            console.error("Error in chat:", error);
-            return {
-                summary: currentSummary,
-                structuredData: currentStructuredData,
-                aiResponse: `發生錯誤: ${error instanceof Error ? error.message : String(error)}`,
-            };
-        }
+        return this.chatService.chat(pageContent, currentSummary, currentStructuredData, userMessage);
     }
 }
