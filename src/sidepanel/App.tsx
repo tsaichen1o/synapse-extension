@@ -1,17 +1,11 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { db } from "../lib/db";
-import {
-    summarizeContentWithAI,
-    chatWithAI,
-} from "../lib/ai";
+import { AI, isAIAvailable } from "../lib/ai";
 import { getPageContent } from "../lib/helper";
 import {
     PageContent,
     StructuredData,
-    SummaryResponse,
-    ChatResponse,
 } from "../lib/types";
-import { extractPageContentFromDOM } from "../lib/extractor";
 
 // Type definitions for component state
 interface ChatMessage {
@@ -25,11 +19,15 @@ type LoadingPhase = "capturing" | "summarizing" | "chatting" | "saving" | null;
 function App(): React.JSX.Element {
     const [loadingPhase, setLoadingPhase] = useState<LoadingPhase>(null);
     const [currentPageUrl, setCurrentPageUrl] = useState<string>("");
+    const [currentPageContent, setCurrentPageContent] = useState<PageContent | null>(null);
     const [initialSummary, setInitialSummary] = useState<string>("");
     const [structuredData, setStructuredData] = useState<StructuredData>({}); // 用於 Key-Value Pairs
     const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
     const [chatInput, setChatInput] = useState<string>("");
-    const chatContainerRef = React.useRef<HTMLDivElement>(null);
+    const chatContainerRef = useRef<HTMLDivElement>(null);
+
+    const aiInstanceRef = useRef<AI | null>(null);
+    const [aiReady, setAiReady] = useState<boolean>(false); // TODO(teresa1o): Use this state to disable buttons until AI is ready
 
     // Auto-scroll to bottom when new messages are added
     useEffect(() => {
@@ -82,21 +80,70 @@ function App(): React.JSX.Element {
                 setCurrentPageUrl(tabs[0].url);
             }
         });
+
+        // Initialize AI instance when component mounts
+        const initializeAI = async () => {
+            try {
+                const available = await isAIAvailable();
+                if (!available) {
+                    console.warn("AI is not available on this device");
+                    setChatMessages([{
+                        sender: "ai",
+                        text: "⚠️ AI is not available. Please check if Chrome Built-in AI is enabled."
+                    }]);
+                    return;
+                }
+
+                console.log("Creating AI instance...");
+                const ai = await AI.create({
+                    temperature: 0.8,
+                    topK: 50,
+                    systemPrompt: 'You are a helpful assistant that analyzes web content, creates summaries, and refines structured data based on user feedback.'
+                });
+                aiInstanceRef.current = ai;
+                console.log("AI instance ready");
+            } catch (error) {
+                console.error("Failed to initialize AI:", error);
+                setChatMessages([{
+                    sender: "ai",
+                    text: `❌ Failed to initialize AI: ${error instanceof Error ? error.message : String(error)}`
+                }]);
+            }
+        };
+
+        initializeAI();
+
+        // Cleanup: destroy AI instance when component unmounts
+        return () => {
+            if (aiInstanceRef.current) {
+                console.log("Destroying AI instance on unmount");
+                aiInstanceRef.current.destroy();
+                aiInstanceRef.current = null;
+            }
+        };
     }, []);
 
     // 處理點擊「擷取此頁面」按鈕的事件
     const handleCapturePage = async (): Promise<void> => {
+        if (!aiInstanceRef.current) {
+            setChatMessages([{
+                sender: "ai",
+                text: "❌ AI is not ready. Please wait or refresh the page."
+            }]);
+            return;
+        }
+
         setLoadingPhase("capturing");
         setInitialSummary("");
         setStructuredData({});
         setChatMessages([]);
 
         try {
-            // const pageContent = extractPageContentFromDOM();
-            // pass the current page URL (fallback to mock) to the PDF extractor
             const pageContent = await getPageContent();
+            setCurrentPageContent(pageContent); // Store for later use in chat
+            
             setLoadingPhase("summarizing");
-            const result = await summarizeContentWithAI(pageContent);
+            const result = await aiInstanceRef.current.summarize(pageContent);
             
             setInitialSummary(result.summary);
             setStructuredData(result.structuredData);
@@ -127,29 +174,40 @@ function App(): React.JSX.Element {
         e.preventDefault();
         if (!chatInput.trim()) return;
 
+        if (!aiInstanceRef.current || !currentPageContent) {
+            setChatMessages((prev: ChatMessage[]) => [
+                ...prev,
+                {
+                    sender: "ai",
+                    text: "❌ AI is not ready or no page content captured. Please capture a page first."
+                }
+            ]);
+            return;
+        }
+
         const userMessage: ChatMessage = { sender: "user", text: chatInput };
         setChatMessages((prev: ChatMessage[]) => [...prev, userMessage]);
         setChatInput("");
         setLoadingPhase("chatting");
 
         try {
-            // TODO: Actually implement conversation with Gemini Nano
-            // const aiResponse = await chatWithAI(
-            // 	mockPageContent,
-            // 	initialSummary,
-            // 	structuredData,
-            // 	userMessage.text
-            // );
+            const aiResponse = await aiInstanceRef.current.chat(
+                currentPageContent,
+                initialSummary,
+                structuredData,
+                userMessage.text
+            );
 
-            // Temporarily use mock response
-            setTimeout(() => {
-                const aiMessage: ChatMessage = {
-                    sender: "ai",
-                    text: `I received your instruction: "${userMessage.text}". I will adjust the summary and structured data accordingly.`,
-                };
-                setChatMessages((prev: ChatMessage[]) => [...prev, aiMessage]);
-                setLoadingPhase(null);
-            }, 1000);
+            // Update summary and structured data based on AI response
+            setInitialSummary(aiResponse.summary);
+            setStructuredData(aiResponse.structuredData);
+
+            const aiMessage: ChatMessage = {
+                sender: "ai",
+                text: aiResponse.aiResponse,
+            };
+            setChatMessages((prev: ChatMessage[]) => [...prev, aiMessage]);
+            setLoadingPhase(null);
         } catch (error) {
             console.error("Chat failed:", error);
             const errorMessage = error instanceof Error ? error.message : "Unknown error";

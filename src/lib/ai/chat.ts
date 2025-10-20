@@ -5,51 +5,43 @@ import { AI } from './ai';
 /**
  * Interactive chat with Chrome Built-in AI (Gemini Nano) for refining summaries 
  * and structured data based on user instructions.
+ * 
+ * @param pageContent - The original page content
+ * @param currentSummary - Current summary text
+ * @param currentStructuredData - Current structured data
+ * @param userMessage - User's chat message
+ * @param aiInstance - Optional existing AI instance to reuse. If not provided, a new instance will be created and destroyed.
  */
 export async function chatWithAI(
     pageContent: PageContent,
     currentSummary: string,
     currentStructuredData: StructuredData,
-    userMessage: string
+    userMessage: string,
+    aiInstance?: AI
 ): Promise<ChatResponse> {
+    const shouldCleanup = !aiInstance;
+
     try {
-        // Create a GeminiAI instance with settings optimized for conversational refinement
-        const ai = await AI.create({
+        // Use provided instance or create a new one
+        const ai = aiInstance || await AI.create({
             temperature: 0.8,
             topK: 50,
             systemPrompt: 'You are a helpful assistant that refines content summaries and structured data based on user feedback.'
         });
 
-        const promptText = getChatPrompt(
+        const result = await ai.chat(
             pageContent,
             currentSummary,
             currentStructuredData,
             userMessage
         );
 
-        // Get the AI response
-        const result = await ai.prompt(promptText);
-
-        // Clean up the AI instance
-        ai.destroy();
-
-        try {
-            const jsonResult = JSON.parse(result);
-            return {
-                summary: jsonResult.summary,
-                structuredData: jsonResult.structuredData,
-                aiResponse:
-                    jsonResult.aiResponse || "好的,我已嘗試根據您的指示進行調整。",
-            };
-        } catch (e) {
-            console.error("無法解析 AI 的對話 JSON 回應:", result, e);
-            // If parsing fails, return the previous state with an error message
-            return {
-                summary: currentSummary,
-                structuredData: currentStructuredData,
-                aiResponse: "抱歉,我無法理解您的指令或解析我的回應。請再試一次。",
-            };
+        // Clean up only if we created the instance ourselves
+        if (shouldCleanup) {
+            ai.destroy();
         }
+
+        return result;
     } catch (error) {
         console.error("Error in chatWithAI:", error);
         // Return previous state with error message
