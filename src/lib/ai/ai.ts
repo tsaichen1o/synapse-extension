@@ -2,7 +2,12 @@ import type {
     AILanguageModelCreateOptions,
     AILanguageModelPromptOptions,
     AILanguageModelSession,
+    PageContent,
+    StructuredData,
+    SummaryResponse,
+    ChatResponse,
 } from '../types';
+import { SummarizeService, ChatService } from './services';
 
 /**
  * GeminiAI - A wrapper class for Chrome Built-in AI (Gemini Nano)
@@ -11,8 +16,16 @@ import type {
 export class AI {
     private nativeSession: AILanguageModelSession;
 
+    // Services for different AI functionalities
+    public readonly summarizeService: SummarizeService;
+    public readonly chatService: ChatService;
+
     private constructor(session: AILanguageModelSession) {
         this.nativeSession = session;
+
+        // Initialize services
+        this.summarizeService = new SummarizeService(this);
+        this.chatService = new ChatService(this);
     }
 
     /**
@@ -44,8 +57,14 @@ export class AI {
                     languages: ["en"],
                 },
             ],
+            monitor(m) {
+                m.addEventListener('downloadprogress', (e) => {
+                    // @ts-ignore
+                    console.log(`Downloaded ${e.loaded * 100}%`);
+                });
+            },
         };
-        // TODO: Remove
+
         console.log("Creating AI session with options:", createOptions);
         // Add system prompt if provided
         if (options?.systemPrompt) {
@@ -142,6 +161,18 @@ export class AI {
     }
 
     /**
+     * Reset the current session by cloning it
+     * This clears conversation history while keeping the initial configuration
+     */
+    async reset(): Promise<void> {
+        const oldSession = this.nativeSession;
+        const clonedSession = await this.nativeSession.clone();
+        this.nativeSession = clonedSession;
+        oldSession.destroy();
+        console.log("AI session has been reset (conversation history cleared)");
+    }
+
+    /**
      * Release resources used by this instance
      */
     destroy(): void {
@@ -153,5 +184,27 @@ export class AI {
      */
     getNativeSession(): AILanguageModelSession {
         return this.nativeSession;
+    }
+
+    /**
+     * Summarize page content using AI
+     * Delegates to SummarizeService
+     */
+    async summarize(pageContent: PageContent): Promise<SummaryResponse> {
+        this.reset();
+        return this.summarizeService.summarize(pageContent);
+    }
+
+    /**
+     * Chat with AI to refine summaries and structured data
+     * Delegates to ChatService
+     */
+    async chat(
+        pageContent: PageContent,
+        currentSummary: string,
+        currentStructuredData: StructuredData,
+        userMessage: string
+    ): Promise<ChatResponse> {
+        return this.chatService.chat(pageContent, currentSummary, currentStructuredData, userMessage);
     }
 }

@@ -71,6 +71,8 @@ export interface AILanguageModelCreateOptions {
     }>;
     /** Signal to abort session creation */
     signal?: AbortSignal;
+    /** Optional monitor callback for download / progress events */
+    monitor?: (monitor: EventTarget) => void;
     /** Expected input types and languages */
     expectedInputs?: Array<{
         type: "text" | "image" | "audio";

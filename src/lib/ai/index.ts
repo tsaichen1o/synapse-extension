@@ -1,8 +1,4 @@
 export { AI } from './ai';
-export { getPageContent } from '../helper';
-export { summarizeContentWithAI } from './summarize';
-export { chatWithAI } from './chat';
-
 import type {
     AILanguageModel,
     AIModelAvailability,
