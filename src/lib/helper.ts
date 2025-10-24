@@ -1,5 +1,4 @@
 import { PageContent } from './types';
-import { extractPageContentFromDOM } from './extractor';
 
 /**
  * Extracts page content from the currently active tab by injecting a DOM
@@ -21,7 +20,7 @@ export async function getPageContent(): Promise<PageContent> {
             chrome.scripting.executeScript(
                 {
                     target: { tabId: tab.id },
-                    func: extractPageContentFromDOM,
+                    files: ['content-injector.js'],
                 },
                 (results: chrome.scripting.InjectionResult[]) => {
                     if (chrome.runtime.lastError) {
