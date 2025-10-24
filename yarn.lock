@@ -338,6 +338,11 @@
     "@jridgewell/resolve-uri" "^3.1.0"
     "@jridgewell/sourcemap-codec" "^1.4.14"
 
+"@mozilla/readability@^0.6.0":
+  version "0.6.0"
+  resolved "https://registry.yarnpkg.com/@mozilla/readability/-/readability-0.6.0.tgz#134e3ce3ff1676716e550de0b8de957bcc59208b"
+  integrity sha512-juG5VWh4qAivzTAeMzvY9xs9HY5rAcr2E4I7tiSSCokRFi7XIZCAu92ZkSTsIj1OPceCifL3cpfteP3pDT9/QQ==
+
 "@nodelib/fs.scandir@2.1.5":
   version "2.1.5"
   resolved "https://registry.npmjs.org/@nodelib/fs.scandir/-/fs.scandir-2.1.5.tgz"
@@ -822,6 +827,11 @@
   version "1.2.16"
   resolved "https://registry.npmjs.org/@types/har-format/-/har-format-1.2.16.tgz"
   integrity sha512-fluxdy7ryD3MV6h8pTfTYpy/xQzCFC7m89nOH9y94cNqJ1mDIDPut7MnRHI3F6qRmh/cT2fUjG1MLdCNb4hE9A==
+
+"@types/mozilla-readability@^0.2.1":
+  version "0.2.1"
+  resolved "https://registry.yarnpkg.com/@types/mozilla-readability/-/mozilla-readability-0.2.1.tgz#3c92215157f2d36d117c2676389887f530ccafd5"
+  integrity sha512-RjLpe3MIpj53L+q50DTNlhv6KjHjgajFQwAF4KuxVZTa2+6Cs2UNAxS5awxABfZEHRYjGKeRDB21Zrtnsi911w==
 
 "@types/react-dom@^19.2.2":
   version "19.2.2"
