@@ -7,7 +7,7 @@ import {
     StructuredData,
 } from "../lib/types";
 
-// Type definitions for component state
+
 interface ChatMessage {
     sender: "user" | "ai";
     text: string;
@@ -15,16 +15,23 @@ interface ChatMessage {
 
 type LoadingPhase = "capturing" | "summarizing" | "chatting" | "saving" | null;
 
-// 側邊欄主應用程式元件
 function App(): React.JSX.Element {
     const [loadingPhase, setLoadingPhase] = useState<LoadingPhase>(null);
     const [currentPageUrl, setCurrentPageUrl] = useState<string>("");
     const [currentPageContent, setCurrentPageContent] = useState<PageContent | null>(null);
+    // original captured summary (before user-AI interactions)
     const [initialSummary, setInitialSummary] = useState<string>("");
+    // the latest summary that updates after each AI interaction
+    const [currentSummary, setCurrentSummary] = useState<string>("");
+    // whether the user has sent at least one chat message (used to hide the original summary)
+    const [hasUserInteracted, setHasUserInteracted] = useState<boolean>(false);
     const [structuredData, setStructuredData] = useState<StructuredData>({}); // 用於 Key-Value Pairs
     const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
     const [chatInput, setChatInput] = useState<string>("");
     const chatContainerRef = useRef<HTMLDivElement>(null);
+
+    // State to trigger animations on update
+    const [justUpdated, setJustUpdated] = useState<'summary' | 'structured' | 'both' | null>(null);
 
     const aiInstanceRef = useRef<AI | null>(null);
     const [aiReady, setAiReady] = useState<boolean>(false); // TODO(teresa1o): Use this state to disable buttons until AI is ready
@@ -49,7 +56,15 @@ function App(): React.JSX.Element {
         }
     }, [chatMessages]);
 
-    // 模擬數據，之後從後端獲取
+    // Effect to reset animation trigger
+    useEffect(() => {
+        if (justUpdated) {
+            const timer = setTimeout(() => setJustUpdated(null), 1200); // Animation duration is 1.2s
+            return () => clearTimeout(timer);
+        }
+    }, [justUpdated]);
+
+    //  --- IGNORE ---
     const mockPageContent: PageContent = {
         title: "Understanding Large Language Models: A Comprehensive Review",
         url: "https://example.com/paper",
@@ -58,7 +73,7 @@ function App(): React.JSX.Element {
         metaDescription: "A comprehensive review of Large Language Models and their implications",
         headings: ["Introduction", "Methodology", "Results", "Discussion", "Conclusion"],
         links: ["https://example.com/reference1", "https://example.com/reference2"],
-        images: ["https://example.com/figure1.png", "https://example.com/figure2.png"]
+        images: ["https://example.com/figure1.png", "https://e xample.com/figure2.png"]
     };
 
     const mockAiSummary = "This paper provides a comprehensive review of Large Language Models (LLMs), tracing their evolution from early neural networks to modern Transformer architectures. It explores key innovations, deployment challenges, future research directions, and ethical and computational cost issues.";
@@ -74,12 +89,33 @@ function App(): React.JSX.Element {
     };
 
     useEffect(() => {
-        // 獲取當前頁面 URL，用於儲存和識別
-        chrome.tabs.query({ active: true, currentWindow: true }, (tabs: chrome.tabs.Tab[]) => {
-            if (tabs[0] && tabs[0].url) {
-                setCurrentPageUrl(tabs[0].url);
+        // Handle tab change events to update the current URL
+        const updateCurrentUrl = () => {            
+            if (!initialSummary) {
+                chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+                    if (tabs[0] && tabs[0].url && tabs[0].url !== currentPageUrl) {
+                        setCurrentPageUrl(tabs[0].url);
+                    }
+                });
             }
-        });
+        };
+
+        const handleTabActivated = (activeInfo: { tabId: number, windowId: number }) => {
+            updateCurrentUrl();
+        };
+
+        const handleTabUpdated = (tabId: number, changeInfo: { url?: string }, tab: chrome.tabs.Tab) => {
+            if (tab.active && changeInfo.url) {
+                if (!initialSummary) {
+                    setCurrentPageUrl(changeInfo.url);
+                }
+            }
+        };
+
+        updateCurrentUrl();
+
+        chrome.tabs.onActivated.addListener(handleTabActivated);
+        chrome.tabs.onUpdated.addListener(handleTabUpdated);
 
         // Initialize AI instance when component mounts
         const initializeAI = async () => {
@@ -113,17 +149,18 @@ function App(): React.JSX.Element {
 
         initializeAI();
 
-        // Cleanup: destroy AI instance when component unmounts
+        // Cleanup: destroy AI instance and remove listeners when component unmounts
         return () => {
+            chrome.tabs.onActivated.removeListener(handleTabActivated);
+            chrome.tabs.onUpdated.removeListener(handleTabUpdated);
             if (aiInstanceRef.current) {
                 console.log("Destroying AI instance on unmount");
                 aiInstanceRef.current.destroy();
                 aiInstanceRef.current = null;
             }
         };
-    }, []);
+    }, [initialSummary, currentPageUrl]);
 
-    // 處理點擊「擷取此頁面」按鈕的事件
     const handleCapturePage = async (): Promise<void> => {
         if (!aiInstanceRef.current) {
             setChatMessages([{
@@ -141,11 +178,15 @@ function App(): React.JSX.Element {
         try {
             const pageContent = await getPageContent();
             setCurrentPageContent(pageContent); // Store for later use in chat
-            
+
             setLoadingPhase("summarizing");
             const result = await aiInstanceRef.current.summarize(pageContent);
-            
+
+            // store original captured summary and initialize currentSummary
             setInitialSummary(result.summary);
+            setCurrentSummary(result.summary);
+            // reset interaction flag when a fresh capture happens
+            setHasUserInteracted(false);
             setStructuredData(result.structuredData);
             setChatMessages([
                 {
@@ -169,7 +210,6 @@ function App(): React.JSX.Element {
         }
     };
 
-    // 處理聊天訊息發送
     const handleChatSubmit = async (e: React.FormEvent<HTMLFormElement>): Promise<void> => {
         e.preventDefault();
         if (!chatInput.trim()) return;
@@ -187,6 +227,8 @@ function App(): React.JSX.Element {
 
         const userMessage: ChatMessage = { sender: "user", text: chatInput };
         setChatMessages((prev: ChatMessage[]) => [...prev, userMessage]);
+        // mark that the user has interacted; hide the original summary
+        setHasUserInteracted(true);
         setChatInput("");
         setLoadingPhase("chatting");
 
@@ -198,15 +240,29 @@ function App(): React.JSX.Element {
                 userMessage.text
             );
 
-            // Update summary and structured data based on AI response
-            setInitialSummary(aiResponse.summary);
+            // Check what has changed to trigger animations
+            const summaryChanged = aiResponse.summary !== currentSummary;
+            const structuredDataChanged = JSON.stringify(aiResponse.structuredData) !== JSON.stringify(structuredData);
+
+            if (summaryChanged && structuredDataChanged) {
+                setJustUpdated('both');
+            } else if (summaryChanged) {
+                setJustUpdated('summary');
+            } else if (structuredDataChanged) {
+                setJustUpdated('structured');
+            }
+
+            // Update the latest summary and structured data based on AI response
+            setCurrentSummary(aiResponse.summary);
             setStructuredData(aiResponse.structuredData);
 
-            const aiMessage: ChatMessage = {
+            const aiResponseMessage: ChatMessage = {
                 sender: "ai",
                 text: aiResponse.aiResponse,
             };
-            setChatMessages((prev: ChatMessage[]) => [...prev, aiMessage]);
+
+            // Add AI's textual response to chat
+            setChatMessages((prev: ChatMessage[]) => [...prev, aiResponseMessage]);
             setLoadingPhase(null);
         } catch (error) {
             console.error("Chat failed:", error);
@@ -321,7 +377,7 @@ function App(): React.JSX.Element {
         setLoadingPhase("saving");
         try {
             // Validate that we have content to save
-            if (!initialSummary || Object.keys(structuredData).length === 0) {
+            if (!currentSummary || Object.keys(structuredData).length === 0) {
                 console.log("Validation failed: missing summary or structured data");
                 setChatMessages((prev: ChatMessage[]) => [
                     ...prev,
@@ -344,8 +400,8 @@ function App(): React.JSX.Element {
             const nodeData = {
                 type: 'paper', // Assuming this is a paper; will be changed to dynamic template type later
                 url: currentPageUrl,
-                title: mockPageContent.title || 'Unknown Title', // Temporarily use mock title; will get from getPageContent later
-                summary: initialSummary, // Original AI summary
+                title: currentPageContent?.title || 'Unknown Title',
+                summary: currentSummary, // Use the latest summary (may be edited via chat)
                 structuredData: structuredData, // Final Key-Value Pairs after AI collaboration
                 chatHistory: chatMessages, // Conversation history
                 createdAt: existingNode ? existingNode.createdAt : new Date(),
@@ -410,7 +466,25 @@ function App(): React.JSX.Element {
         }
     };
 
-    // 渲染結構化數據的輔助函數
+    const handleDiscard = (): void => {
+        console.log("Discarding current session...");
+        setInitialSummary("");
+        setCurrentSummary("");
+        setStructuredData({});
+        setChatMessages([]);
+        setHasUserInteracted(false);
+        setCurrentPageContent(null);
+        setLoadingPhase(null);
+        setChatInput("");
+
+        // Re-fetch current URL to ensure it's up-to-date
+        chrome.tabs.query({ active: true, currentWindow: true }, (tabs: chrome.tabs.Tab[]) => {
+            if (tabs[0] && tabs[0].url) {
+                setCurrentPageUrl(tabs[0].url);
+            }
+        });
+    };
+
     const renderStructuredData = (data: StructuredData): React.JSX.Element[] => {
         return Object.entries(data).map(([key, value]) => {
             const displayValue = Array.isArray(value) ? value.join(", ") : String(value);
@@ -423,7 +497,6 @@ function App(): React.JSX.Element {
         });
     };
 
-    // 渲染聊天訊息的輔助函數
     const renderChatMessages = (): React.JSX.Element[] => {
         console.log("renderChatMessages called with", chatMessages.length, "messages");
         return chatMessages.map((message, index) => {
@@ -467,7 +540,6 @@ function App(): React.JSX.Element {
                 </p>
             </div>
 
-            {/* 當前頁面信息 */}
             {currentPageUrl && (
                 <div className="mb-6 p-4 bg-white/60 backdrop-blur-md rounded-2xl border border-white/30 shadow-lg">
                     <div className="flex items-center gap-2 mb-2">
@@ -482,11 +554,10 @@ function App(): React.JSX.Element {
                 </div>
             )}
 
-            {/* 主要操作按鈕 */}
             <div className="mb-8">
                 <button
                     onClick={handleCapturePage}
-                    disabled={loadingPhase !== null}
+                    disabled={loadingPhase !== null || !!initialSummary}
                     className="group w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:from-gray-400 disabled:to-gray-500 text-white font-semibold py-4 px-6 rounded-2xl transition-all duration-300 shadow-lg hover:shadow-xl disabled:shadow-none transform hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-3"
                 >
                     {loadingPhase === "capturing" ? (
@@ -515,102 +586,191 @@ function App(): React.JSX.Element {
                 </button>
             </div>
 
-            {/* 初始摘要顯示 */}
-            {initialSummary && (
-                <div className="mb-6 animate-fadeIn">
-                    <div className="flex items-center gap-2 mb-3">
-                        <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                        <h3 className="text-lg font-bold text-gray-800">Summary</h3>
-                    </div>
-                    <div className="p-5 bg-white/60 backdrop-blur-md rounded-2xl border border-white/30 shadow-lg">
-                        <p className="text-gray-700 leading-relaxed text-sm">{initialSummary}</p>
-                    </div>
-                </div>
-            )}
-
-            {/* 結構化數據顯示 */}
-            {Object.keys(structuredData).length > 0 && (
-                <div className="mb-6 animate-fadeIn">
-                    <div className="flex items-center gap-2 mb-3">
-                        <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                        </svg>
-                        <h3 className="text-lg font-bold text-gray-800">Structured Information</h3>
-                    </div>
-                    <div className="space-y-2">{renderStructuredData(structuredData)}</div>
-                </div>
-            )}
-
-            {/* 聊天區域 */}
-            {chatMessages.length > 0 && (
-                <div className="mb-6 animate-fadeIn">
-                    <div className="flex items-center gap-2 mb-3">
-                        <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                        </svg>
-                        <h3 className="text-lg font-bold text-gray-800">Chat with AI</h3>
-                    </div>
-                    <div
-                        ref={chatContainerRef}
-                        className="bg-white/40 backdrop-blur-sm rounded-2xl border border-white/30 shadow-lg p-4 max-h-80 overflow-y-auto space-y-2 scroll-smooth"
-                    >
-                        {(() => {
-                            const messages = renderChatMessages();
-                            console.log("Actually rendering", messages.length, "message elements in DOM");
-                            return messages;
-                        })()}
-                        {loadingPhase === "chatting" && (
-                            <div className="flex items-center justify-center gap-2 text-purple-600 text-sm py-4">
-                                <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            <div className={`transition-all duration-500 ${hasUserInteracted ? 'flex flex-row gap-6' : 'flex flex-col'}`}>
+                <div className={`transition-all duration-500 ${hasUserInteracted ? 'w-1/2' : 'w-full'}`}>
+                    {initialSummary && !hasUserInteracted && (
+                        <div className="mb-6 animate-fadeIn">
+                            <div className="flex items-center gap-2 mb-3">
+                                <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                 </svg>
-                                <span>AI thinking...</span>
+                                <h3 className="text-lg font-bold text-gray-800">Captured Summary</h3>
                             </div>
-                        )}
-                    </div>
-                </div>
-            )}
+                            <div className="p-5 bg-white/60 backdrop-blur-md rounded-2xl border border-white/30 shadow-lg">
+                                <p className="text-gray-700 leading-relaxed text-sm">{initialSummary}</p>
+                            </div>
+                        </div>
+                    )}
 
-            {/* 聊天輸入表單 */}
-            {initialSummary && (
-                <form onSubmit={handleChatSubmit} className="mb-6">
-                    <div className="flex gap-3">
-                        <div className="flex-1 relative">
-                            <input
-                                type="text"
-                                value={chatInput}
-                                onChange={(e) => setChatInput(e.target.value)}
-                                placeholder="Chat with AI, e.g.: Simplify the summary, add more keywords..."
-                                className="w-full px-4 py-3 pr-12 bg-white/60 backdrop-blur-md border border-white/30 rounded-2xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all shadow-md text-sm placeholder:text-gray-400"
-                                disabled={loadingPhase === "chatting"}
-                            />
-                            <button
-                                type="submit"
-                                disabled={loadingPhase === "chatting" || !chatInput.trim()}
-                                className="absolute right-2 top-1/2 -translate-y-1/2 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 disabled:from-gray-400 disabled:to-gray-500 text-white p-2 rounded-xl transition-all duration-300 shadow-lg disabled:shadow-none transform hover:scale-105 active:scale-95"
-                                title="Send message"
-                                aria-label="Send message"
-                            >
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                    {(currentSummary && (hasUserInteracted || currentSummary !== initialSummary)) && (
+                        <div className={`mb-6 animate-fadeIn rounded-2xl ${justUpdated === 'summary' || justUpdated === 'both' ? 'animate-flash' : ''}`}>
+                            <div className="flex items-center gap-2 mb-3">
+                                <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                 </svg>
-                            </button>
+                                <h3 className="text-lg font-bold text-gray-800">Latest Summary</h3>
+                            </div>
+                            <div className="p-5 bg-white/60 backdrop-blur-md rounded-2xl border border-white/30 shadow-lg">
+                                <p className="text-gray-700 leading-relaxed text-sm">{currentSummary}</p>
+                            </div>
+                        </div>
+                    )}
+
+                    {Object.keys(structuredData).length > 0 && (
+                        <div className={`mb-6 animate-fadeIn rounded-2xl ${justUpdated === 'structured' || justUpdated === 'both' ? 'animate-flash' : ''}`}>
+                            <div className="flex items-center gap-2 mb-3">
+                                <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                                </svg>
+                                <h3 className="text-lg font-bold text-gray-800">Structured Information</h3>
+                            </div>
+                            <div className="space-y-2">{renderStructuredData(structuredData)}</div>
+                        </div>
+                    )}
+                </div>
+
+                {hasUserInteracted && (
+                    <div className="w-1/2">
+                        <div className="sticky top-6">
+                            {chatMessages.length > 0 && (
+                                <div className="mb-6 animate-fadeIn">
+                                    <div className="flex items-center gap-2 mb-3">
+                                        <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                                        </svg>
+                                        <h3 className="text-lg font-bold text-gray-800">Chat with AI</h3>
+                                    </div>
+                                    <div
+                                        ref={chatContainerRef}
+                                        className="bg-white/40 backdrop-blur-sm rounded-2xl border border-white/30 shadow-lg p-4 max-h-[calc(100vh-250px)] overflow-y-auto space-y-2 scroll-smooth"
+                                    >
+                                        {(() => {
+                                            const messages = renderChatMessages();
+                                            console.log("Actually rendering", messages.length, "message elements in DOM");
+                                            return messages;
+                                        })()}
+                                        {loadingPhase === "chatting" && (
+                                            <div className="flex items-center justify-center gap-2 text-purple-600 text-sm py-4">
+                                                <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                </svg>
+                                                <span>AI thinking...</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {initialSummary && (
+                                <form onSubmit={handleChatSubmit} className="mb-6">
+                                    <div className="flex gap-3">
+                                        <div className="flex-1 relative">
+                                            <input
+                                                type="text"
+                                                value={chatInput}
+                                                onChange={(e) => setChatInput(e.target.value)}
+                                                placeholder="Chat with AI, e.g.: Simplify the summary, add more keywords..."
+                                                className="w-full px-4 py-3 pr-12 bg-white/60 backdrop-blur-md border border-white/30 rounded-2xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all shadow-md text-sm placeholder:text-gray-400"
+                                                disabled={loadingPhase === "chatting"}
+                                            />
+                                            <button
+                                                type="submit"
+                                                disabled={loadingPhase === "chatting" || !chatInput.trim()}
+                                                className="absolute right-2 top-1/2 -translate-y-1/2 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 disabled:from-gray-400 disabled:to-gray-500 text-white p-2 rounded-xl transition-all duration-300 shadow-lg disabled:shadow-none transform hover:scale-105 active:scale-95"
+                                                title="Send message"
+                                                aria-label="Send message"
+                                            >
+                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                                                </svg>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </form>
+                            )}
                         </div>
                     </div>
-                </form>
-            )}
+                )}
 
-            {/* 儲存按鈕 */}
+                {!hasUserInteracted && (
+                    <div className="w-full">
+                        {chatMessages.length > 0 && (
+                            <div className="mb-6 animate-fadeIn">
+                                <div className="flex items-center gap-2 mb-3">
+                                    <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                                    </svg>
+                                    <h3 className="text-lg font-bold text-gray-800">Chat with AI</h3>
+                                </div>
+                                <div
+                                    ref={chatContainerRef}
+                                    className="bg-white/40 backdrop-blur-sm rounded-2xl border border-white/30 shadow-lg p-4 max-h-80 overflow-y-auto space-y-2 scroll-smooth"
+                                >
+                                    {(() => {
+                                        const messages = renderChatMessages();
+                                        console.log("Actually rendering", messages.length, "message elements in DOM");
+                                        return messages;
+                                    })()}
+                                    {loadingPhase === "chatting" && (
+                                        <div className="flex items-center justify-center gap-2 text-purple-600 text-sm py-4">
+                                            <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                            <span>AI thinking...</span>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {initialSummary && (
+                            <form onSubmit={handleChatSubmit} className="mb-6">
+                                <div className="flex gap-3">
+                                    <div className="flex-1 relative">
+                                        <input
+                                            type="text"
+                                            value={chatInput}
+                                            onChange={(e) => setChatInput(e.target.value)}
+                                            placeholder="Chat with AI, e.g.: Simplify the summary, add more keywords..."
+                                            className="w-full px-4 py-3 pr-12 bg-white/60 backdrop-blur-md border border-white/30 rounded-2xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all shadow-md text-sm placeholder:text-gray-400"
+                                            disabled={loadingPhase === "chatting"}
+                                        />
+                                        <button
+                                            type="submit"
+                                            disabled={loadingPhase === "chatting" || !chatInput.trim()}
+                                            className="absolute right-2 top-1/2 -translate-y-1/2 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 disabled:from-gray-400 disabled:to-gray-500 text-white p-2 rounded-xl transition-all duration-300 shadow-lg disabled:shadow-none transform hover:scale-105 active:scale-95"
+                                            title="Send message"
+                                            aria-label="Send message"
+                                        >
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
+                        )}
+                    </div>
+                )}
+            </div>
+
+
             {initialSummary && (
-                <div className="mb-6">
+                <div className="mb-6 grid grid-cols-2 gap-3">
                     <button
-                        onClick={() => {
-                            console.log("Save button clicked!");
-                            handleSaveToDatabase();
-                        }}
+                        onClick={handleDiscard}
+                        disabled={loadingPhase !== null}
+                        className="w-full bg-red-100/60 backdrop-blur-md hover:bg-red-200/80 disabled:bg-gray-300/60 border border-red-200 text-red-700 font-semibold py-3 px-6 rounded-2xl transition-all duration-300 shadow-lg hover:shadow-xl disabled:shadow-none transform hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2"
+                    >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                        <span>Discard</span>
+                    </button>
+                    <button
+                        onClick={handleSaveToDatabase}
                         disabled={loadingPhase !== null}
                         className="w-full bg-white/60 backdrop-blur-md hover:bg-white/80 disabled:bg-gray-300/60 border border-purple-200 text-purple-700 font-semibold py-3 px-6 rounded-2xl transition-all duration-300 shadow-lg hover:shadow-xl disabled:shadow-none transform hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2"
                     >
@@ -627,14 +787,13 @@ function App(): React.JSX.Element {
                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
                                 </svg>
-                                <span>Save to Knowledge Base</span>
+                                <span>Save</span>
                             </>
                         )}
                     </button>
                 </div>
             )}
 
-            {/* 查看知識圖譜按鈕 */}
             <div className="mb-6">
                 <button
                     onClick={() => {
@@ -650,7 +809,6 @@ function App(): React.JSX.Element {
                 </button>
             </div>
 
-            {/* Footer */}
             <div className="text-center text-xs text-gray-500 mt-8 space-y-1">
                 <p className="font-medium">Powered by Gemini Nano</p>
                 <p className="text-gray-400">Chrome Built-in AI</p>

@@ -7,7 +7,17 @@ export default {
 		"./src/**/*.{js,ts,jsx,tsx}", // Scan all JS/TS/JSX/TSX files
 	],
 	theme: {
-		extend: {},
+		extend: {
+			keyframes: {
+				flash: {
+					"0%, 100%": { backgroundColor: "transparent" },
+					"50%": { backgroundColor: "rgba(168, 85, 247, 0.15)" }, // A light purple flash
+				},
+			},
+			animation: {
+				flash: "flash 1.2s ease-in-out",
+			},
+		},
 	},
 	plugins: [],
 };
