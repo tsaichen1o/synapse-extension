@@ -5,9 +5,9 @@ import type {
     PageContent,
     StructuredData,
     SummaryResponse,
-    ChatResponse,
+    ChatResponse, CondensedPageContent
 } from '../types';
-import { SummarizeService, ChatService } from './services';
+import { SummarizeService, ChatService, CondenseService } from './services';
 
 /**
  * GeminiAI - A wrapper class for Chrome Built-in AI (Gemini Nano)
@@ -19,6 +19,7 @@ export class AI {
     // Services for different AI functionalities
     public readonly summarizeService: SummarizeService;
     public readonly chatService: ChatService;
+    public readonly condenseService: CondenseService;
 
     private constructor(session: AILanguageModelSession) {
         this.nativeSession = session;
@@ -26,6 +27,7 @@ export class AI {
         // Initialize services
         this.summarizeService = new SummarizeService(this);
         this.chatService = new ChatService(this);
+        this.condenseService = new CondenseService(this);
     }
 
     /**
@@ -174,25 +176,35 @@ export class AI {
     }
 
     /**
+     * Condense page content to avoid token limits
+     * Delegates to CondenseService
+     */
+    async condense(pageContent: PageContent): Promise<CondensedPageContent> {
+        return this.condenseService.condensePageContent(pageContent);
+    }
+
+    /**
      * Summarize page content using AI
+     * Accepts either raw PageContent or pre-condensed CondensedPageContent
      * Delegates to SummarizeService
      */
-    async summarize(pageContent: PageContent): Promise<SummaryResponse> {
+    async summarize(input: PageContent | CondensedPageContent): Promise<SummaryResponse> {
         // Reset session before summarizing to clear any previous context
         await this.reset();
-        return this.summarizeService.summarize(pageContent);
+        return this.summarizeService.summarize(input);
     }
 
     /**
      * Chat with AI to refine summaries and structured data
+     * Accepts either raw PageContent or pre-condensed CondensedPageContent
      * Delegates to ChatService
      */
     async chat(
-        pageContent: PageContent,
+        input: PageContent | CondensedPageContent,
         currentSummary: string,
         currentStructuredData: StructuredData,
         userMessage: string
     ): Promise<ChatResponse> {
-        return this.chatService.chat(pageContent, currentSummary, currentStructuredData, userMessage);
+        return this.chatService.chat(input, currentSummary, currentStructuredData, userMessage);
     }
 }

@@ -5,6 +5,28 @@
  * https://developer.chrome.com/docs/ai/built-in
  */
 
+/**
+ * Condensed content structure that's optimized for AI processing
+ * This structure significantly reduces token usage while preserving all essential information
+ */
+export interface CondensedPageContent {
+    title: string;
+    url: string;
+    // Core content condensed to fit within token limits
+    condensedContent: string;
+    // Key metadata extracted
+    metadata: {
+        description?: string;
+        mainTopics: string[];
+        keyEntities: string[];
+        contentType: string; // e.g., "article", "documentation", "research-paper", "blog"
+    };
+    // Original length info for reference
+    originalLength: number;
+    condensedLength: number;
+    compressionRatio: number;
+}
+
 // Page Content Types
 export interface PageContent {
     /** Page title, typically document.title */
