@@ -1,9 +1,10 @@
-import { PageContent, SummaryResponse } from '../../types';
+import { PageContent, SummaryResponse, CondensedPageContent } from '../../types';
 import type { AI } from '../ai';
 import { parseAIJSON } from './utils';
 
 /**
  * Summarization service that uses an AI instance with multi-step iterative refinement
+ * Can work with either raw PageContent or pre-condensed CondensedPageContent
  */
 export class SummarizeService {
     constructor(private ai: AI) { }
@@ -11,24 +12,27 @@ export class SummarizeService {
     /**
      * Step 1: Extract key points and main themes from the content
      */
-    private buildExtractionPrompt(pageContent: PageContent): string {
+    private buildExtractionPrompt(content: string, title: string, metadata?: CondensedPageContent['metadata']): string {
+        const metadataInfo = metadata ? `
+## Pre-extracted Metadata:
+Content Type: ${metadata.contentType}
+Main Topics: ${metadata.mainTopics.join(', ')}
+Key Entities: ${metadata.keyEntities.join(', ')}
+` : '';
+
         return `
 # Step 1: Content Extraction and Initial Analysis
 
 ## Page Information:
-Title: ${pageContent.title}
-URL: ${pageContent.url}
-Description: ${pageContent.metaDescription || "None"}
+Title: ${title}
+${metadataInfo}
 
-## Main Content:
-${pageContent.content || pageContent.abstract || pageContent.fullText}
-
-## Heading Structure:
-${pageContent.headings?.slice(0, 10).join(', ') || "None"}
+## Content:
+${content}
 
 # Your Task
-Analyze this web page and extract:
-1. Main topic and purpose of the page
+Analyze this content and extract:
+1. Main topic and purpose
 2. Key themes and concepts (3-5 major themes)
 3. Important facts, data, or findings
 4. Target audience or intended use case
@@ -46,7 +50,7 @@ Return your analysis in JSON format:
     /**
      * Step 2: Identify and extract structured data based on initial analysis
      */
-    private buildStructuredDataPrompt(pageContent: PageContent, extraction: any): string {
+    private buildStructuredDataPrompt(content: string, title: string, extraction: any): string {
         return `
 # Step 2: Structured Data Extraction
 
@@ -54,9 +58,9 @@ Return your analysis in JSON format:
 Main Topic: ${extraction.mainTopic}
 Key Themes: ${extraction.keyThemes.join(', ')}
 
-## Original Content:
-Title: ${pageContent.title}
-Content: ${pageContent.content || pageContent.abstract || pageContent.fullText}
+## Content:
+Title: ${title}
+${content}
 
 # Your Task
 Based on the page type and content, extract the most relevant structured information.
@@ -79,7 +83,7 @@ Return a JSON object with relevant key-value pairs:
     /**
      * Step 3: Generate a polished summary incorporating all previous analysis
      */
-    private buildSummaryPrompt(pageContent: PageContent, extraction: any, structuredData: any): string {
+    private buildSummaryPrompt(content: string, extraction: any, structuredData: any): string {
         return `
 # Step 3: Final Summary Generation
 
@@ -90,8 +94,8 @@ Key Themes: ${extraction.keyThemes.join(', ')}
 ## Structured Data Extracted:
 ${JSON.stringify(structuredData, null, 2)}
 
-## Original Content Reference:
-${(pageContent.content || pageContent.abstract || pageContent.fullText)}...
+## Content:
+${content}
 
 # Your Task
 Write a concise, informative summary (150-300 words) that:
@@ -139,28 +143,39 @@ Provide refined versions. Return in JSON format:
 
     /**
      * Summarize page content using multi-step iterative refinement
+     * Works with either PageContent or CondensedPageContent
      */
-    async summarize(pageContent: PageContent): Promise<SummaryResponse> {
+    async summarize(input: PageContent | CondensedPageContent): Promise<SummaryResponse> {
         try {
             console.log("🔄 Starting multi-step summarization process...");
 
+            // Determine if input is condensed or raw
+            const isCondensed = 'condensedContent' in input;
+            const content = isCondensed
+                ? input.condensedContent
+                : (input.content || input.abstract || input.fullText);
+            const title = input.title;
+            const metadata = isCondensed ? input.metadata : undefined;
+
+            console.log(`📦 Input type: ${isCondensed ? 'Condensed' : 'Raw'} (${content.length} chars)`);
+
             // Step 1: Extract key information and themes
             console.log("📊 Step 1: Extracting key themes and concepts...");
-            const extractionPrompt = this.buildExtractionPrompt(pageContent);
+            const extractionPrompt = this.buildExtractionPrompt(content, title, metadata);
             const extractionResult = await this.ai.prompt(extractionPrompt);
             const extraction = parseAIJSON(extractionResult);
             console.log("✓ Extraction complete:", extraction);
 
             // Step 2: Extract structured data based on content type
             console.log("🏗️  Step 2: Extracting structured data...");
-            const structuredDataPrompt = this.buildStructuredDataPrompt(pageContent, extraction);
+            const structuredDataPrompt = this.buildStructuredDataPrompt(content, title, extraction);
             const structuredDataResult = await this.ai.prompt(structuredDataPrompt);
             let structuredData = parseAIJSON(structuredDataResult);
             console.log("✓ Structured data extracted:", structuredData);
 
             // Step 3: Generate comprehensive summary
             console.log("✍️  Step 3: Generating polished summary...");
-            const summaryPrompt = this.buildSummaryPrompt(pageContent, extraction, structuredData);
+            const summaryPrompt = this.buildSummaryPrompt(content, extraction, structuredData);
             let summary = await this.ai.prompt(summaryPrompt);
             summary = summary.trim();
             console.log("✓ Summary generated");
@@ -187,20 +202,26 @@ Provide refined versions. Return in JSON format:
             console.error("❌ Error in multi-step summarize:", error);
             // Fallback to simple summarization if multi-step fails
             console.warn("⚠️  Falling back to single-step summarization...");
-            return this.fallbackSummarize(pageContent);
+            return this.fallbackSummarize(input);
         }
     }
 
     /**
      * Fallback to simple single-step summarization if multi-step fails
      */
-    private async fallbackSummarize(pageContent: PageContent): Promise<SummaryResponse> {
+    private async fallbackSummarize(input: PageContent | CondensedPageContent): Promise<SummaryResponse> {
         try {
-            const promptText = `
-Analyze this web page and provide a summary (150-300 words) and key structured information.
+            const isCondensed = 'condensedContent' in input;
+            const content = isCondensed
+                ? input.condensedContent
+                : (input.content || input.abstract || input.fullText);
+            const title = input.title;
 
-Title: ${pageContent.title}
-Content: ${pageContent.content || pageContent.abstract || pageContent.fullText}
+            const promptText = `
+Analyze this content and provide a summary (150-300 words) and key structured information.
+
+Title: ${title}
+Content: ${content}
 
 Return in JSON format:
 {

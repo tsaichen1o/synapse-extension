@@ -1,9 +1,10 @@
-import { PageContent, StructuredData, ChatResponse } from '../../types';
+import { PageContent, StructuredData, ChatResponse, CondensedPageContent } from '../../types';
 import type { AI } from '../ai';
 import { parseAIJSON } from './utils';
 
 /**
  * Chat service that uses an AI instance with multi-step iterative processing
+ * Can work with either raw PageContent or pre-condensed CondensedPageContent
  */
 export class ChatService {
     constructor(private ai: AI) { }
@@ -12,7 +13,7 @@ export class ChatService {
      * Step 1: Understand user intent and what needs to be modified
      */
     private buildIntentAnalysisPrompt(
-        pageContent: PageContent,
+        input: PageContent | CondensedPageContent,
         currentSummary: string,
         currentStructuredData: StructuredData,
         userMessage: string
@@ -48,14 +49,14 @@ Return in JSON format:
      * Step 2: Execute modifications based on intent analysis
      */
     private buildModificationPrompt(
-        pageContent: PageContent,
+        content: string,
         currentSummary: string,
         currentStructuredData: StructuredData,
         userMessage: string,
         intent: any
     ): string {
         const relevantContent = intent.needsOriginalContent
-            ? `\n## Original Content Reference:\n${(pageContent.content || pageContent.abstract || pageContent.fullText)}...`
+            ? `\n## Original Content Reference:\n${content}`
             : '';
 
         return `
@@ -138,9 +139,10 @@ Return in JSON format:
 
     /**
      * Chat with AI to refine summaries and structured data using multi-step processing
+     * Works with either PageContent or CondensedPageContent
      */
     async chat(
-        pageContent: PageContent,
+        input: PageContent | CondensedPageContent,
         currentSummary: string,
         currentStructuredData: StructuredData,
         userMessage: string
@@ -149,10 +151,18 @@ Return in JSON format:
             console.log("🔄 Starting multi-step chat processing...");
             console.log("💬 User message:", userMessage);
 
+            // Determine if input is condensed or raw
+            const isCondensed = 'condensedContent' in input;
+            const content = isCondensed
+                ? input.condensedContent
+                : (input.content || input.abstract || input.fullText);
+
+            console.log(`📦 Input type: ${isCondensed ? 'Condensed' : 'Raw'} (${content.length} chars)`);
+
             // Step 1: Analyze user intent
             console.log("🧠 Step 1: Analyzing user intent...");
             const intentPrompt = this.buildIntentAnalysisPrompt(
-                pageContent,
+                input,
                 currentSummary,
                 currentStructuredData,
                 userMessage
@@ -167,7 +177,7 @@ Return in JSON format:
                 const directResponsePrompt = `
 Context: ${currentSummary}
 Structured Data: ${JSON.stringify(currentStructuredData)}
-Original Content: ${pageContent.content || pageContent.abstract || pageContent.fullText}
+Original Content: ${content}
 
 User Question: "${userMessage}"
 
@@ -185,7 +195,7 @@ Provide a helpful, accurate answer based on the context and original content.
             // Step 2: Execute modifications
             console.log("⚙️  Step 2: Executing modifications...");
             const modificationPrompt = this.buildModificationPrompt(
-                pageContent,
+                content,
                 currentSummary,
                 currentStructuredData,
                 userMessage,
@@ -225,7 +235,7 @@ Provide a helpful, accurate answer based on the context and original content.
             console.error("❌ Error in multi-step chat:", error);
             // Fallback to simple chat if multi-step fails
             console.warn("⚠️  Falling back to single-step chat...");
-            return this.fallbackChat(pageContent, currentSummary, currentStructuredData, userMessage);
+            return this.fallbackChat(input, currentSummary, currentStructuredData, userMessage);
         }
     }
 
@@ -233,12 +243,17 @@ Provide a helpful, accurate answer based on the context and original content.
      * Fallback to simple single-step chat if multi-step fails
      */
     private async fallbackChat(
-        pageContent: PageContent,
+        input: PageContent | CondensedPageContent,
         currentSummary: string,
         currentStructuredData: StructuredData,
         userMessage: string
     ): Promise<ChatResponse> {
         try {
+            const isCondensed = 'condensedContent' in input;
+            const content = isCondensed
+                ? input.condensedContent
+                : (input.content || input.abstract || input.fullText);
+            const title = input.title;
             const structuredDataString = JSON.stringify(currentStructuredData, null, 2);
 
             const promptText = `
@@ -246,7 +261,7 @@ You are helping refine a web page summary and structured data.
 
 Current Summary: ${currentSummary}
 Current Structured Data: ${structuredDataString}
-Original Content: ${pageContent.title} - ${pageContent.content || pageContent.fullText}
+Original Content: ${title} - ${content}
 
 User Request: "${userMessage}"
 
