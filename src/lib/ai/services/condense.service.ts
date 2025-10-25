@@ -30,12 +30,8 @@ import type { MetadataExtraction } from './schemas';
 export class CondenseService {
     constructor(protected ai: AI) { }
 
-    // Maximum characters for content input per iteration
-    private readonly CHUNK_SIZE = 3000;
-    // Target length for final condensed content
-    private readonly TARGET_CONDENSED_LENGTH = 5000;
-    // Maximum paragraphs to process in one batch
-    private readonly BATCH_SIZE = 5;
+    private readonly CHUNK_SIZE = 6000;
+    private readonly TARGET_CONDENSED_LENGTH = 8000;
 
     /**
      * Main method: Convert PageContent to CondensedPageContent using iterative AI processing

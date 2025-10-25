@@ -4,10 +4,9 @@ import { normalizeStructuredData } from './utils';
 import {
     extractionSchema,
     structuredDataSchema,
-    refinementSchema,
     summaryResponseSchema
 } from './schemas';
-import type { ContentExtraction, Refinement } from './schemas';
+import type { ContentExtraction } from './schemas';
 
 /**
  * Summarization service that uses an AI instance with multi-step iterative refinement
@@ -111,36 +110,6 @@ Return ONLY the summary text (no JSON, no markdown, just the summary paragraph).
     }
 
     /**
-     * Step 4: Quality check and refinement
-     */
-    private buildRefinementPrompt(summary: string, structuredData: any, extraction: ContentExtraction): string {
-        return `
-# Step 4: Quality Check and Refinement
-
-## Current Summary:
-${summary}
-
-## Current Structured Data:
-${JSON.stringify(structuredData, null, 2)}
-
-## Original Key Themes:
-${extraction.keyThemes.join(', ')}
-
-# Your Task
-Review the summary and structured data for:
-1. Accuracy - Does the summary reflect the key themes?
-2. Completeness - Are all important aspects covered?
-3. Clarity - Is the language clear and professional?
-4. Structured data quality - Are the key-value pairs meaningful and well-organized?
-
-Provide refined versions. Output a JSON object with:
-- summary: refined summary (if improvements needed, otherwise keep original)
-- structuredData: object with refined structured data
-- improvementsMade: brief description of what was improved, or 'No improvements needed'
-        `.trim();
-    }
-
-    /**
      * Summarize page content using multi-step iterative refinement
      * Works with either PageContent or CondensedPageContent
      */
@@ -179,23 +148,11 @@ Provide refined versions. Output a JSON object with:
             summary = summary.trim();
             console.log("✓ Summary generated");
 
-            // Step 4: Quality check and refinement
-            console.log("🔍 Step 4: Quality check and refinement...");
-            const refinementPrompt = this.buildRefinementPrompt(summary, structuredData, extraction);
-            const refinement = await this.ai.promptStructured<Refinement>(refinementPrompt, refinementSchema);
-            console.log("✓ Refinement complete:", refinement.improvementsMade);
-
-            // Use refined versions if improvements were made
-            const finalSummary = refinement.summary || summary;
-            let finalStructuredData = refinement.structuredData || structuredData;
-            // Ensure final structured data is also normalized
-            finalStructuredData = normalizeStructuredData(finalStructuredData);
-
             console.log("✅ Multi-step summarization complete!");
 
             return {
-                summary: finalSummary,
-                structuredData: finalStructuredData,
+                summary: summary,
+                structuredData: structuredData,
             };
 
         } catch (error) {

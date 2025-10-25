@@ -231,35 +231,6 @@ export const structuredDataSchema = {
 };
 
 /**
- * Refinement result from SummarizeService
- */
-export interface Refinement {
-    summary: string;
-    structuredData: Record<string, any>;
-    improvementsMade: string;
-}
-
-/**
- * Schema for refinement in SummarizeService
- */
-export const refinementSchema = {
-    type: "object",
-    properties: {
-        summary: {
-            type: "string"
-        },
-        structuredData: {
-            type: "object",
-            additionalProperties: true
-        },
-        improvementsMade: {
-            type: "string"
-        }
-    },
-    required: ["summary", "structuredData", "improvementsMade"]
-};
-
-/**
  * Fallback summarization response (used when multi-step processing fails)
  */
 export interface SummaryResponseFallback {
