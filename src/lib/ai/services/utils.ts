@@ -52,7 +52,10 @@ export function normalizeStructuredData(data: Record<string, any>): Record<strin
     const normalized: Record<string, any> = {};
 
     for (const [key, value] of Object.entries(data)) {
-        if (Array.isArray(value)) {
+        if (value === null || value === undefined) {
+            // Preserve null/undefined values
+            normalized[key] = value;
+        } else if (Array.isArray(value)) {
             // Keep arrays as arrays, but ensure items are properly formatted
             normalized[key] = value.map(item => {
                 if (typeof item === 'object' && item !== null) {
@@ -60,7 +63,7 @@ export function normalizeStructuredData(data: Record<string, any>): Record<strin
                 }
                 return item;
             });
-        } else if (typeof value === 'object' && value !== null) {
+        } else if (typeof value === 'object') {
             // Convert nested objects to readable strings
             normalized[key] = stringifyStructuredValue(value);
         } else {

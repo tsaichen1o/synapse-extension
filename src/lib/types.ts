@@ -50,13 +50,11 @@ export interface PageContent {
 }
 
 // Type definitions for structured data
-export interface StructuredData {
-    /**
-     * A flexible map for extracted key/value pairs. Values are intentionally
-     * permissive to allow strings, arrays, numbers, booleans, or nested objects.
-     */
-    [key: string]: string | string[] | number | boolean | object;
-}
+/**
+ * Structured data extracted from web page content
+ * Flexible key-value pairs that can contain various types of information
+ */
+export type StructuredData = Record<string, any>;
 
 // Type definitions for AI responses
 export interface SummaryResponse {

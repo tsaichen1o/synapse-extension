@@ -217,17 +217,64 @@ export const extractionSchema = {
 };
 
 /**
- * Structured data extraction result (flexible object with any properties)
+ * Structured data extraction result (flattened structure)
  */
-export type StructuredDataExtraction = Record<string, any>;
+export interface StructuredDataExtraction {
+    // Factual entities (Who, What, Where, When)
+    authors: string[];
+    organizations: string[];
+    mentioned_people: string[];
+    locations: string[];
+    key_events: string[];
+    external_references: string[];
+
+    // Conceptual & Technical entities (How, Why)
+    key_concepts: string[];
+    technologies_tools: string[];
+    methodologies: string[];
+    code_elements: string[];
+
+    // Relational & Purpose-Driven entities
+    problems_discussed: string[];
+    solutions_proposed: string[];
+    comparisons: string[];
+
+    // Data & Media entities
+    datasets_mentioned: string[];
+    data_sources: string[];
+    mentioned_media: string[];
+}
 
 /**
  * Schema for structured data extraction in SummarizeService
  */
 export const structuredDataSchema = {
     type: "object",
-    additionalProperties: true,
-    minProperties: 1
+    properties: {
+        // Factual entities
+        authors: { type: "array", items: { type: "string" } },
+        organizations: { type: "array", items: { type: "string" } },
+        mentioned_people: { type: "array", items: { type: "string" } },
+        locations: { type: "array", items: { type: "string" } },
+        key_events: { type: "array", items: { type: "string" } },
+        external_references: { type: "array", items: { type: "string" } },
+
+        // Conceptual & Technical entities
+        key_concepts: { type: "array", items: { type: "string" } },
+        technologies_tools: { type: "array", items: { type: "string" } },
+        methodologies: { type: "array", items: { type: "string" } },
+        code_elements: { type: "array", items: { type: "string" } },
+
+        // Relational & Purpose-Driven entities
+        problems_discussed: { type: "array", items: { type: "string" } },
+        solutions_proposed: { type: "array", items: { type: "string" } },
+        comparisons: { type: "array", items: { type: "string" } },
+
+        // Data & Media entities
+        datasets_mentioned: { type: "array", items: { type: "string" } },
+        data_sources: { type: "array", items: { type: "string" } },
+        mentioned_media: { type: "array", items: { type: "string" } }
+    },
 };
 
 /**

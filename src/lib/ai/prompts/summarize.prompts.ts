@@ -57,16 +57,47 @@ Title: ${title}
 ${content}
 
 # Your Task
-Based on the page type and content, extract the most relevant structured information.
-Adapt your extraction to the content type (e.g., research paper, blog post, documentation, news article).
+Extract structured data from the content following the schema below.
 
-For research papers, extract: Authors, Year, Methodology, Key Findings, Citations
-For blog posts, extract: Author, Date, Category, Tags, Key Takeaways
-For documentation, extract: Version, Language, Framework, Key Features, Prerequisites
-For news articles, extract: Date, Category, Location, People Mentioned, Key Events
+## CRITICAL RULES:
+- You **MUST** output a JSON object matching the exact schema below
+- **ALL** keys must be present in the output
+- For metadata fields (content_type, publication_date, source_domain): use null if not found
+- For list fields: use an empty array [] if no relevant items are found
+- Do **NOT** omit any keys or add extra keys
+- List fields should contain **specific, concrete items only** - avoid vague or generic entries
 
-Output a JSON object with relevant key-value pairs. Values can be strings, arrays, or numbers as appropriate.
-Ensure at least one key-value pair is included.
+## Output Schema:
+
+{
+  "authors": ["List of authors or primary contributors"],
+  "organizations": ["Organizations, companies, or institutions mentioned"],
+  "mentioned_people": ["People mentioned in text (excluding authors)"],
+  "locations": ["Geographical locations mentioned"],
+  "key_events": ["Specific named events (e.g., 'Google I/O 2025', 'World War II')"],
+  "external_references": ["External sources, DOIs, papers, or links cited"],
+  
+  "key_concepts": ["Core topics or abstract concepts (e.g., 'Machine Learning', 'Quantum Computing')"],
+  "technologies_tools": ["Specific software, hardware, libraries, frameworks (e.g., 'React', 'TensorFlow', 'AWS')"],
+  "methodologies": ["Algorithms, methods, or approaches (e.g., 'K-means Clustering', 'Agile Development')"],
+  "code_elements": ["Function names, APIs, class names mentioned (e.g., 'cudaMalloc()', 'useState()')"],
+  
+  "problems_discussed": ["Specific challenges or issues addressed (e.g., 'Memory leaks in C++')"],
+  "solutions_proposed": ["Specific solutions or recommendations (e.g., 'Use smart pointers')"],
+  "comparisons": ["Direct A vs B comparisons (e.g., 'Python vs Java', 'SQL vs NoSQL')"],
+  
+  "datasets_mentioned": ["Named datasets (e.g., 'ImageNet', 'MNIST', 'CIFAR-10')"],
+  "data_sources": ["Data providers or platforms (e.g., 'Kaggle', 'U.S. Census Bureau')"],
+  "mentioned_media": ["Books, papers, movies, podcasts referenced (e.g., 'Clean Code', 'The Pragmatic Programmer')"]
+}
+
+## Extraction Guidelines:
+- Be specific: Extract concrete items, not categories. Good: "React", "Vue.js". Bad: "frontend frameworks"
+- Be selective: Only include items explicitly mentioned or clearly implied in the content
+- Use exact names: Preserve proper capitalization and formatting (e.g., "TensorFlow" not "tensorflow")
+- For dates: Extract from metadata, headers, or publication info; use YYYY-MM-DD format
+- For domain: Extract from URL or source information
+- Empty is OK: Many fields will be empty arrays for most content - this is expected and correct
         `.trim();
     }
 

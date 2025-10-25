@@ -213,8 +213,6 @@ export class AI {
      * Delegates to SummarizeService
      */
     async summarize(input: PageContent | CondensedPageContent): Promise<SummaryResponse> {
-        // Reset session before summarizing to clear any previous context
-        await this.reset();
         return this.summarizeService.summarize(input);
     }
 

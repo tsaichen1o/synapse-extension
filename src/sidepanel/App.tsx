@@ -182,13 +182,15 @@ function App(): React.JSX.Element {
             const pageContent = await getPageContent();
             setCurrentPageContent(pageContent);
 
-            console.log("🖼️  Appending image context to AI session...");
-            await aiInstanceRef.current.appendImageContext(pageContent);
-
             setLoadingPhase("condensing");
             console.log("🔄 Condensing content...");
             const condensed = await aiInstanceRef.current.condense(pageContent);
             setCondensedContent(condensed);
+
+            await aiInstanceRef.current.reset();
+
+            console.log("🖼️  Appending image context to AI session...");
+            await aiInstanceRef.current.appendImageContext(pageContent);
 
             setLoadingPhase("summarizing");
             console.log("📝 Generating summary from condensed content...");

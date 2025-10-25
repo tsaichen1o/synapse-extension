@@ -292,19 +292,10 @@ export class CondenseService {
      * Split content into paragraphs
      */
     private splitIntoParagraphs(content: string): string[] {
-        // Split by double newlines (common paragraph separator)
         const paragraphs = content
-            .split(/\n\n+/)
+            .split(/\n+/)
             .map(p => p.trim())
             .filter(p => p.length > 0);
-
-        // If no double newlines, try single newlines
-        if (paragraphs.length === 1) {
-            return content
-                .split(/\n+/)
-                .map(p => p.trim())
-                .filter(p => p.length > 50); // Filter out very short lines
-        }
 
         return paragraphs;
     }
