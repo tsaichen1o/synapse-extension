@@ -61,6 +61,10 @@ if (!window.LanguageModel) {
                         }
                     }) as unknown as ReadableStream<string>;
                 },
+                append: async (messages: any[]) => {
+                    console.log(`🧪 Mock append called with ${messages.length} message(s)`);
+                    return Promise.resolve();
+                },
                 clone: async function () { return this; },
                 destroy: () => { console.log("Mock session destroyed"); },
             };

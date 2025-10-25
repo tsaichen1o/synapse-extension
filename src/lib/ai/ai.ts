@@ -5,9 +5,10 @@ import type {
     PageContent,
     StructuredData,
     SummaryResponse,
-    ChatResponse, CondensedPageContent
+    ChatResponse,
+    CondensedPageContent,
 } from '../types';
-import { SummarizeService, ChatService, CondenseService } from './services';
+import { SummarizeService, ChatService, CondenseService, ImageService } from './services';
 
 /**
  * GeminiAI - A wrapper class for Chrome Built-in AI (Gemini Nano)
@@ -20,6 +21,7 @@ export class AI {
     public readonly summarizeService: SummarizeService;
     public readonly chatService: ChatService;
     public readonly condenseService: CondenseService;
+    public readonly imageService: ImageService;
 
     private constructor(session: AILanguageModelSession) {
         this.nativeSession = session;
@@ -28,6 +30,7 @@ export class AI {
         this.summarizeService = new SummarizeService(this);
         this.chatService = new ChatService(this);
         this.condenseService = new CondenseService(this);
+        this.imageService = new ImageService(this);
     }
 
     /**
@@ -47,6 +50,15 @@ export class AI {
         const createOptions: AILanguageModelCreateOptions = {
             temperature: options?.temperature ?? params.defaultTemperature,
             topK: options?.topK ?? params.defaultTopK,
+            expectedInputs: [
+                {
+                    type: "text",
+                    languages: ["en"],
+                },
+                {
+                    type: "image", // Support image input for multimodal processing
+                },
+            ],
             expectedOutputs: [
                 {
                     type: "text",
@@ -104,16 +116,19 @@ export class AI {
 
     /**
      * Send a prompt and get structured JSON output using JSON Schema
+     * 
+     * @param prompt - The prompt text to send to the model
+     * @param schema - JSON Schema object to constrain the response format
+     * @param omitSchemaFromInput - If true, schema won't count against input quota (recommended)
      */
     async promptStructured<T = any>(
         prompt: string,
-        schema: object
+        schema: object,
+        omitSchemaFromInput: boolean = true
     ): Promise<T> {
         const result = await this.nativeSession.prompt(prompt, {
-            responseConstraint: {
-                type: "json-schema",
-                schema: schema,
-            },
+            responseConstraint: schema,
+            omitResponseConstraintInput: omitSchemaFromInput,
         });
 
         return JSON.parse(result) as T;
@@ -173,6 +188,15 @@ export class AI {
      */
     getNativeSession(): AILanguageModelSession {
         return this.nativeSession;
+    }
+
+    /**
+     * Append images from PageContent to the session as context
+     * This should be called after condense() to provide visual context
+     * Delegates to ImageService
+     */
+    async appendImageContext(pageContent: PageContent): Promise<void> {
+        return this.imageService.appendImageContext(pageContent);
     }
 
     /**

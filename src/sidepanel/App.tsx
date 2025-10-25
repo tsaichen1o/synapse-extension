@@ -178,29 +178,24 @@ function App(): React.JSX.Element {
         setCondensedContent(null);
 
         try {
-            // Step 1: Capture page content
+            console.log("📄 Capturing page content...");
             const pageContent = await getPageContent();
             setCurrentPageContent(pageContent);
-            console.log("📄 Page content captured:", pageContent.title);
 
-            // Step 2: Condense content (critical step to avoid token limits!)
+            console.log("🖼️  Appending image context to AI session...");
+            await aiInstanceRef.current.appendImageContext(pageContent);
+
             setLoadingPhase("condensing");
             console.log("🔄 Condensing content...");
             const condensed = await aiInstanceRef.current.condense(pageContent);
             setCondensedContent(condensed);
-            console.log(`✅ Content condensed: ${condensed.originalLength} → ${condensed.condensedLength} chars`);
-            console.log(`   Compression ratio: ${(condensed.compressionRatio * 100).toFixed(1)}%`);
-            console.log(`   Content type: ${condensed.metadata.contentType}`);
 
-            // Step 3: Use condensed content to generate summary
             setLoadingPhase("summarizing");
             console.log("📝 Generating summary from condensed content...");
             const result = await aiInstanceRef.current.summarize(condensed);
 
-            // store original captured summary and initialize currentSummary
             setInitialSummary(result.summary);
             setCurrentSummary(result.summary);
-            // reset interaction flag when a fresh capture happens
             setHasUserInteracted(false);
             setStructuredData(result.structuredData);
             setChatMessages([
@@ -242,14 +237,12 @@ function App(): React.JSX.Element {
 
         const userMessage: ChatMessage = { sender: "user", text: chatInput };
         setChatMessages((prev: ChatMessage[]) => [...prev, userMessage]);
-        // mark that the user has interacted; hide the original summary
         setHasUserInteracted(true);
         setChatInput("");
         setLoadingPhase("chatting");
 
         try {
             console.log("💬 Sending chat with condensed content...");
-            // Use condensed content instead of raw pageContent
             const aiResponse = await aiInstanceRef.current.chat(
                 condensedContent,
                 currentSummary,

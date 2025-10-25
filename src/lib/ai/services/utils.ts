@@ -3,91 +3,71 @@
  */
 
 /**
- * Cleans AI output by removing markdown code block markers and other common artifacts
+ * Safely stringifies values in structured data to prevent [object Object] display
+ * Handles arrays, objects, and primitive values appropriately
  * 
- * Handles cases like:
- * - ```json\n{...}\n```
- * - ```\n{...}\n```
- * - Leading/trailing whitespace
- * - Multiple consecutive newlines
- * 
- * @param output - Raw output from AI model
- * @returns Cleaned output string
+ * @param value - Any value from structured data
+ * @returns Human-readable string representation
  */
-export function cleanAIOutput(output: string): string {
-    let cleaned = output.trim();
+export function stringifyStructuredValue(value: any): string {
+    if (value === null || value === undefined) {
+        return '';
+    }
 
-    // Remove markdown code block markers with optional language identifier
-    // Matches: ```json, ```javascript, ```typescript, etc.
-    cleaned = cleaned.replace(/^```[\w]*\s*\n?/g, '');
-    cleaned = cleaned.replace(/\n?```\s*$/g, '');
+    if (typeof value === 'string') {
+        return value;
+    }
 
-    // Remove any remaining standalone ``` markers
-    cleaned = cleaned.replace(/^```|```$/g, '');
+    if (typeof value === 'number' || typeof value === 'boolean') {
+        return String(value);
+    }
 
-    // Trim again after removing markers
-    cleaned = cleaned.trim();
+    if (Array.isArray(value)) {
+        // Handle array of primitives
+        if (value.every(item => typeof item !== 'object' || item === null)) {
+            return value.join(', ');
+        }
+        // Handle array of objects
+        return value.map(item => stringifyStructuredValue(item)).join(', ');
+    }
 
-    return cleaned;
+    if (typeof value === 'object') {
+        // For objects, create a readable key-value representation
+        return Object.entries(value)
+            .map(([k, v]) => `${k}: ${stringifyStructuredValue(v)}`)
+            .join('; ');
+    }
+
+    return String(value);
 }
 
 /**
- * Safely parses JSON from AI output, attempting to clean it first if parsing fails
+ * Normalizes structured data to ensure all values are properly formatted
+ * This prevents [object Object] issues when displaying data
  * 
- * @param output - Raw output from AI model (possibly containing markdown markers)
- * @returns Parsed JSON object
- * @throws Error if JSON parsing fails after cleaning attempts
+ * @param data - Raw structured data from AI response
+ * @returns Normalized structured data with properly formatted values
  */
-export function parseAIJSON<T = any>(output: string): T {
-    try {
-        // Try parsing directly first
-        return JSON.parse(output);
-    } catch (firstError) {
-        // If that fails, try cleaning and parsing again
-        try {
-            const cleaned = cleanAIOutput(output);
-            return JSON.parse(cleaned);
-        } catch (secondError) {
-            console.error("Failed to parse AI output as JSON:", {
-                original: output,
-                cleaned: cleanAIOutput(output),
-                firstError,
-                secondError
+export function normalizeStructuredData(data: Record<string, any>): Record<string, any> {
+    const normalized: Record<string, any> = {};
+
+    for (const [key, value] of Object.entries(data)) {
+        if (Array.isArray(value)) {
+            // Keep arrays as arrays, but ensure items are properly formatted
+            normalized[key] = value.map(item => {
+                if (typeof item === 'object' && item !== null) {
+                    return stringifyStructuredValue(item);
+                }
+                return item;
             });
-            throw new Error("Unable to parse AI response as valid JSON");
-        }
-    }
-}
-
-/**
- * Extracts JSON from text that may contain additional prose or explanations
- * Looks for the first valid JSON object or array in the text
- * 
- * @param text - Text that may contain JSON along with other content
- * @returns Parsed JSON object or null if no valid JSON found
- */
-export function extractJSON<T = any>(text: string): T | null {
-    const cleaned = cleanAIOutput(text);
-
-    // Try to find JSON object
-    const objectMatch = cleaned.match(/\{[\s\S]*\}/);
-    if (objectMatch) {
-        try {
-            return JSON.parse(objectMatch[0]);
-        } catch (e) {
-            // Continue to array check
+        } else if (typeof value === 'object' && value !== null) {
+            // Convert nested objects to readable strings
+            normalized[key] = stringifyStructuredValue(value);
+        } else {
+            // Keep primitives as-is
+            normalized[key] = value;
         }
     }
 
-    // Try to find JSON array
-    const arrayMatch = cleaned.match(/\[[\s\S]*\]/);
-    if (arrayMatch) {
-        try {
-            return JSON.parse(arrayMatch[0]);
-        } catch (e) {
-            // No valid JSON found
-        }
-    }
-
-    return null;
+    return normalized;
 }

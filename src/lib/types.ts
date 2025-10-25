@@ -115,14 +115,38 @@ export interface AILanguageModelCreateOptions {
 export interface AILanguageModelPromptOptions {
     /** Signal to abort the prompt */
     signal?: AbortSignal;
-    /** JSON Schema or regex to constrain response format */
-    responseConstraint?: {
-        type: "json-schema";
-        schema: object;
-    } | {
-        type: "regex";
-        pattern: string;
-    };
+    /** JSON Schema to constrain response format - pass the schema object directly */
+    responseConstraint?: object;
+    /** Omit the response constraint from counting against input quota */
+    omitResponseConstraintInput?: boolean;
+}
+
+/**
+ * Multimodal content types for AI input
+ */
+export interface AITextContent {
+    type: "text";
+    value: string;
+}
+
+export interface AIImageContent {
+    type: "image";
+    value: FileList | Blob | string; // Support various image formats
+}
+
+export interface AIAudioContent {
+    type: "audio";
+    value: FileList | Blob | string;
+}
+
+export type AIContentPart = AITextContent | AIImageContent | AIAudioContent;
+
+/**
+ * Message structure for multimodal input
+ */
+export interface AIMessage {
+    role: "user" | "assistant" | "system";
+    content: string | AIContentPart[];
 }
 
 /**
@@ -138,6 +162,11 @@ export interface AILanguageModelSession {
      * Send a prompt and get a streaming response
      */
     promptStreaming(text: string, options?: AILanguageModelPromptOptions): ReadableStream<string>;
+
+    /**
+     * Append context to the session (supports multimodal input)
+     */
+    append(messages: AIMessage[]): Promise<void>;
 
     /**
      * Clone the session to reset context while keeping initial prompts

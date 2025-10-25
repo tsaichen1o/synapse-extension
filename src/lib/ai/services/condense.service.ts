@@ -1,5 +1,7 @@
 import type { AI } from '../ai';
 import type { PageContent, CondensedPageContent } from '../../types';
+import { metadataExtractionSchema } from './schemas';
+import type { MetadataExtraction } from './schemas';
 
 
 
@@ -103,24 +105,19 @@ Headings: ${pageContent.headings?.slice(0, 10).join(', ') || 'None'}
 First 1000 characters of content:
 ${(pageContent.content || pageContent.abstract || pageContent.fullText || '').substring(0, 1000)}
 
-Return JSON with:
-{
-  "description": "Brief description (1-2 sentences)",
-  "mainTopics": ["topic1", "topic2", "topic3"],
-  "keyEntities": ["entity1", "entity2", "entity3"],
-  "contentType": "article|documentation|research-paper|blog|news|tutorial|other"
-}
+Output a JSON object with:
+- description: brief description (1-2 sentences)
+- mainTopics: array of 1-5 main topics
+- keyEntities: array of 1-5 key entities (people, places, organizations, etc.)
+- contentType: one of "article", "documentation", "research-paper", "blog", "news", "tutorial", "other"
         `.trim();
 
         try {
-            const result = await this.ai.prompt(prompt);
-            const parsed = JSON.parse(result);
-            return {
-                description: parsed.description || pageContent.metaDescription,
-                mainTopics: parsed.mainTopics || [],
-                keyEntities: parsed.keyEntities || [],
-                contentType: parsed.contentType || 'article',
-            };
+            const metadata = await this.ai.promptStructured<MetadataExtraction>(
+                prompt,
+                metadataExtractionSchema
+            );
+            return metadata;
         } catch (error) {
             console.warn("⚠️  Failed to extract metadata, using defaults:", error);
             return {

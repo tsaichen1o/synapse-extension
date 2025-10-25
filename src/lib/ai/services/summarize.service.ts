@@ -1,6 +1,13 @@
 import { PageContent, SummaryResponse, CondensedPageContent } from '../../types';
 import type { AI } from '../ai';
-import { parseAIJSON } from './utils';
+import { normalizeStructuredData } from './utils';
+import {
+    extractionSchema,
+    structuredDataSchema,
+    refinementSchema,
+    summaryResponseSchema
+} from './schemas';
+import type { ContentExtraction, Refinement } from './schemas';
 
 /**
  * Summarization service that uses an AI instance with multi-step iterative refinement
@@ -37,20 +44,18 @@ Analyze this content and extract:
 3. Important facts, data, or findings
 4. Target audience or intended use case
 
-Return your analysis in JSON format:
-{
-  "mainTopic": "Brief description of the main topic",
-  "keyThemes": ["Theme 1", "Theme 2", "Theme 3"],
-  "importantFacts": ["Fact 1", "Fact 2", "Fact 3"],
-  "targetAudience": "Description of target audience"
-}
+Output a JSON object with:
+- mainTopic: brief description of the main topic
+- keyThemes: array of 3-5 key themes
+- importantFacts: array of important facts
+- targetAudience: description of target audience
         `.trim();
     }
 
     /**
      * Step 2: Identify and extract structured data based on initial analysis
      */
-    private buildStructuredDataPrompt(content: string, title: string, extraction: any): string {
+    private buildStructuredDataPrompt(content: string, title: string, extraction: ContentExtraction): string {
         return `
 # Step 2: Structured Data Extraction
 
@@ -71,19 +76,15 @@ For blog posts, extract: Author, Date, Category, Tags, Key Takeaways
 For documentation, extract: Version, Language, Framework, Key Features, Prerequisites
 For news articles, extract: Date, Category, Location, People Mentioned, Key Events
 
-Return a JSON object with relevant key-value pairs:
-{
-  "Key1": "Value1 or [array of values]",
-  "Key2": "Value2",
-  "KeyN": "ValueN"
-}
+Output a JSON object with relevant key-value pairs. Values can be strings, arrays, or numbers as appropriate.
+Ensure at least one key-value pair is included.
         `.trim();
     }
 
     /**
      * Step 3: Generate a polished summary incorporating all previous analysis
      */
-    private buildSummaryPrompt(content: string, extraction: any, structuredData: any): string {
+    private buildSummaryPrompt(content: string, extraction: ContentExtraction, structuredData: any): string {
         return `
 # Step 3: Final Summary Generation
 
@@ -112,7 +113,7 @@ Return ONLY the summary text (no JSON, no markdown, just the summary paragraph).
     /**
      * Step 4: Quality check and refinement
      */
-    private buildRefinementPrompt(summary: string, structuredData: any, extraction: any): string {
+    private buildRefinementPrompt(summary: string, structuredData: any, extraction: ContentExtraction): string {
         return `
 # Step 4: Quality Check and Refinement
 
@@ -132,12 +133,10 @@ Review the summary and structured data for:
 3. Clarity - Is the language clear and professional?
 4. Structured data quality - Are the key-value pairs meaningful and well-organized?
 
-Provide refined versions. Return in JSON format:
-{
-  "summary": "Refined summary (if improvements needed, otherwise keep original)",
-  "structuredData": { "refined structured data" },
-  "improvementsMade": "Brief description of what was improved, or 'No improvements needed'"
-}
+Provide refined versions. Output a JSON object with:
+- summary: refined summary (if improvements needed, otherwise keep original)
+- structuredData: object with refined structured data
+- improvementsMade: brief description of what was improved, or 'No improvements needed'
         `.trim();
     }
 
@@ -162,15 +161,15 @@ Provide refined versions. Return in JSON format:
             // Step 1: Extract key information and themes
             console.log("📊 Step 1: Extracting key themes and concepts...");
             const extractionPrompt = this.buildExtractionPrompt(content, title, metadata);
-            const extractionResult = await this.ai.prompt(extractionPrompt);
-            const extraction = parseAIJSON(extractionResult);
+            const extraction = await this.ai.promptStructured<ContentExtraction>(extractionPrompt, extractionSchema);
             console.log("✓ Extraction complete:", extraction);
 
             // Step 2: Extract structured data based on content type
             console.log("🏗️  Step 2: Extracting structured data...");
             const structuredDataPrompt = this.buildStructuredDataPrompt(content, title, extraction);
-            const structuredDataResult = await this.ai.prompt(structuredDataPrompt);
-            let structuredData = parseAIJSON(structuredDataResult);
+            let structuredData = await this.ai.promptStructured<Record<string, any>>(structuredDataPrompt, structuredDataSchema);
+            // Normalize structured data to prevent [object Object] display issues
+            structuredData = normalizeStructuredData(structuredData);
             console.log("✓ Structured data extracted:", structuredData);
 
             // Step 3: Generate comprehensive summary
@@ -183,13 +182,14 @@ Provide refined versions. Return in JSON format:
             // Step 4: Quality check and refinement
             console.log("🔍 Step 4: Quality check and refinement...");
             const refinementPrompt = this.buildRefinementPrompt(summary, structuredData, extraction);
-            const refinementResult = await this.ai.prompt(refinementPrompt);
-            const refinement = parseAIJSON(refinementResult);
+            const refinement = await this.ai.promptStructured<Refinement>(refinementPrompt, refinementSchema);
             console.log("✓ Refinement complete:", refinement.improvementsMade);
 
             // Use refined versions if improvements were made
             const finalSummary = refinement.summary || summary;
-            const finalStructuredData = refinement.structuredData || structuredData;
+            let finalStructuredData = refinement.structuredData || structuredData;
+            // Ensure final structured data is also normalized
+            finalStructuredData = normalizeStructuredData(finalStructuredData);
 
             console.log("✅ Multi-step summarization complete!");
 
@@ -223,18 +223,15 @@ Analyze this content and provide a summary (150-300 words) and key structured in
 Title: ${title}
 Content: ${content}
 
-Return in JSON format:
-{
-  "summary": "Your summary here",
-  "structuredData": { "Key1": "Value1", "Key2": "Value2" }
-}
+Output a JSON object with:
+- summary: your summary here (150-300 words)
+- structuredData: object with relevant key-value pairs
             `.trim();
 
-            const result = await this.ai.prompt(promptText);
-            const jsonResult: SummaryResponse = parseAIJSON<SummaryResponse>(result);
+            const jsonResult = await this.ai.promptStructured<SummaryResponse>(promptText, summaryResponseSchema);
             return {
                 summary: jsonResult.summary,
-                structuredData: jsonResult.structuredData,
+                structuredData: normalizeStructuredData(jsonResult.structuredData),
             };
         } catch (error) {
             console.error("❌ Fallback summarization also failed:", error);
