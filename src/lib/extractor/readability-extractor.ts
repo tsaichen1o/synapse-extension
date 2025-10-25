@@ -55,7 +55,7 @@ export function extractPageContentWithReadability(): PageContent | null {
         metadata: {
             description: article.excerpt || metaDescription || undefined,
             contentType,
-            tags: headings.slice(0, 5),
+            tags: headings ,
         },
 
         images: [...new Set(images)],

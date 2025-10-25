@@ -259,7 +259,7 @@ export class CondenseService {
             const structure = await this.ai.prompt(prompt);
             return structure.trim();
         } catch (error) {
-            console.warn("⚠️  Failed to initialize summary structure, using empty structure");
+            console.warn("⚠️  Failed to initialize summary structure:", error);
             // Return a simple empty structure
             if (contentType === 'research-paper') {
                 return JSON.stringify({

@@ -1,7 +1,5 @@
 import type { PageContent } from '../types';
 
-const MAX_MAIN_CONTENT_LENGTH = 7000;
-
 /**
  * Extract page content from DOM - generic fallback extractor
  * This function runs in page context (injected via chrome.scripting.executeScript)
@@ -41,8 +39,7 @@ export function extractPageContentFromDOM(): PageContent {
     // Extract first few paragraphs as short content
     const paragraphs = Array.from((mainContent || document.body).querySelectorAll('p'))
         .map(p => p.textContent?.trim())
-        .filter((text): text is string => Boolean(text))
-        .slice(0, 3);
+        .filter((text): text is string => Boolean(text));
 
     const shortContent = paragraphs.join('\n\n');
 
@@ -50,17 +47,17 @@ export function extractPageContentFromDOM(): PageContent {
         title,
         url: window.location.href,
         abstract: undefined,
-        mainContent: shortContent || fullText.substring(0, MAX_MAIN_CONTENT_LENGTH),
+        mainContent: shortContent || fullText,
         fullText,
 
         metadata: {
             description,
             contentType: 'generic',
-            tags: headings.slice(0, 5),
+            tags: headings,
         },
 
-        links: links.slice(0, 10),
-        images: images.slice(0, 5),
+        links: links,
+        images: images,
 
         extractorType: 'generic'
     };

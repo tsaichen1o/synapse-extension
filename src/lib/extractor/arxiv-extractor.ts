@@ -51,7 +51,7 @@ export function extractArxivPaper(doc: Document): PageContent | null {
             authors,
             contentType: 'research-paper',
             tags,
-            description: abstract.substring(0, 200),
+            description: abstract,
             sections,
             paperStructure,
             extra: {
@@ -120,7 +120,7 @@ function extractTags(sections: ContentSection[]): string[] {
         }
     });
 
-    return tags.slice(0, 5); // Limit to 5 main tags
+    return tags
 }
 
 /**
@@ -135,7 +135,7 @@ function analyzePaperStructure(abstract: string, sections: ContentSection[]): Pa
         : undefined;
 
     // Main contribution is typically in the abstract
-    const mainContribution = abstract.substring(0, 300) + '...';
+    const mainContribution = abstract;
 
     // Find methodology section
     const methodSection = sections.find((s: ContentSection) =>
@@ -143,7 +143,7 @@ function analyzePaperStructure(abstract: string, sections: ContentSection[]): Pa
         s.title.toLowerCase().includes('approach') ||
         s.title.toLowerCase().includes('framework')
     );
-    const methodology = methodSection?.content.substring(0, 200) + '...';
+    const methodology = methodSection?.content;
 
     // Find results/conclusion
     const resultsSection = sections.find((s: ContentSection) =>
@@ -151,7 +151,7 @@ function analyzePaperStructure(abstract: string, sections: ContentSection[]): Pa
         s.title.toLowerCase().includes('conclusion') ||
         s.title.toLowerCase().includes('finding')
     );
-    const keyFindings = resultsSection?.content.substring(0, 200) + '...';
+    const keyFindings = resultsSection?.content;
 
     return {
         researchQuestion,
@@ -244,7 +244,7 @@ function extractSections(doc: Document): ContentSection[] {
         }
 
         // Skip Acknowledgments if present (usually has id like "acknowledgments" or in title)
-        const titleElement = sectionElement.querySelector('h2.ltx_title');
+        const titleElement = sectionElement.querySelector(':scope > h2.ltx_title');
         const title = titleElement?.textContent?.trim() || '';
         if (title.toLowerCase().includes('acknowledgment')) {
             return;
@@ -267,7 +267,7 @@ function extractSections(doc: Document): ContentSection[] {
 function extractSection(sectionElement: Element): ContentSection | null {
     const id = sectionElement.getAttribute('id') || '';
 
-    // Get section title
+    // Get section title - can be h2 (section), h3 (subsection), or h4 (subsubsection)
     const titleElement = sectionElement.querySelector(':scope > h2.ltx_title, :scope > h3.ltx_title, :scope > h4.ltx_title');
     if (!titleElement) return null;
 
@@ -296,9 +296,9 @@ function extractSection(sectionElement: Element): ContentSection | null {
         });
     });
 
-    // Extract subsections recursively
+    // Extract subsections recursively - including both ltx_section, ltx_subsection, and ltx_subsubsection
     const subsections: ContentSection[] = [];
-    const subsectionElements = sectionElement.querySelectorAll(':scope > section.ltx_section');
+    const subsectionElements = sectionElement.querySelectorAll(':scope > section.ltx_section, :scope > section.ltx_subsection, :scope > section.ltx_subsubsection');
 
     subsectionElements.forEach(subsectionElement => {
         const subsection = extractSection(subsectionElement);
