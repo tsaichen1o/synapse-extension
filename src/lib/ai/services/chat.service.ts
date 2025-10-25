@@ -35,7 +35,7 @@ export class ChatService {
             const isCondensed = 'condensedContent' in input;
             const content = isCondensed
                 ? input.condensedContent
-                : (input.content || input.abstract || input.fullText);
+                : (input.mainContent || input.abstract || input.fullText);
 
             console.log(`📦 Input type: ${isCondensed ? 'Condensed' : 'Raw'} (${content.length} chars)`);
 
@@ -104,7 +104,7 @@ export class ChatService {
             const isCondensed = 'condensedContent' in input;
             const content = isCondensed
                 ? input.condensedContent
-                : (input.content || input.abstract || input.fullText);
+                : (input.mainContent || input.abstract || input.fullText);
             const title = input.title;
 
             const promptText = ChatPrompts.fallback(content, title, currentSummary, currentStructuredData, userMessage);

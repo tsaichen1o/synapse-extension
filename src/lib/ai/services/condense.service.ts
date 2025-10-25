@@ -5,7 +5,6 @@ import type { MetadataExtraction } from './schemas';
 import { CondensePrompts } from '../prompts';
 
 
-
 /**
  * CondenseService - Iteratively processes and condenses PageContent to avoid token limits
  * 
@@ -14,6 +13,11 @@ import { CondensePrompts } from '../prompts';
  * 2. Processing chunks iteratively with AI session
  * 3. Maintaining context across chunks
  * 4. Producing optimized CondensedPageContent structure
+ * 
+ * ALL CONTENT TYPES USE THE SAME PIPELINE:
+ * - Uses standardized PageContent.mainContent (already formatted by extractors)
+ * - No special handling for different extractors - they all output the same format
+ * - Adapts processing based on contentType metadata, not extractor type
  * 
  * Key benefits:
  * - Handles content of ANY size without hitting token limits
@@ -37,11 +41,15 @@ export class CondenseService {
     /**
      * Main method: Convert PageContent to CondensedPageContent using iterative AI processing
      * This method handles content of any size by processing it in chunks
+     * 
+     * NOW UNIFIED: All content types go through the same pipeline
      */
     async condensePageContent(pageContent: PageContent): Promise<CondensedPageContent> {
         console.log("🔄 Starting iterative content condensing process...");
+        console.log(`📦 Content type: ${pageContent.metadata.contentType}, Extractor: ${pageContent.extractorType}`);
 
-        const rawContent = pageContent.content || pageContent.abstract || pageContent.fullText || '';
+        // Use standardized mainContent (already formatted by extractors)
+        const rawContent = pageContent.mainContent || pageContent.abstract || pageContent.fullText || '';
         const originalLength = rawContent.length;
 
         console.log(`📏 Original content length: ${originalLength} chars`);
@@ -50,10 +58,10 @@ export class CondenseService {
             // Reset AI session for fresh context
             await this.ai.reset();
 
-            // Step 1: Identify content type and extract metadata
-            console.log("🔍 Step 1: Analyzing content type and extracting metadata...");
-            const metadata = await this.extractMetadata(pageContent);
-            console.log("✓ Metadata extracted:", metadata);
+            // Step 1: Extract or use existing metadata
+            console.log("🔍 Step 1: Preparing metadata...");
+            const metadata = await this.prepareMetadata(pageContent);
+            console.log("✓ Metadata ready:", metadata);
 
             // Step 2: Split content into manageable chunks
             console.log("✂️  Step 2: Splitting content into chunks...");
@@ -62,7 +70,7 @@ export class CondenseService {
 
             // Step 3: Process chunks iteratively to condense
             console.log("🔄 Step 3: Processing chunks iteratively...");
-            const condensedContent = await this.processChunksIteratively(chunks, metadata.contentType);
+            const condensedContent = await this.processChunksIteratively(chunks, metadata.contentType, metadata);
             console.log(`✓ Content condensed to ${condensedContent.length} chars`);
 
             const compressionRatio = condensedContent.length / originalLength;
@@ -88,9 +96,31 @@ export class CondenseService {
     }
 
     /**
+     * Prepare metadata - use existing metadata from extractors or extract with AI
+     */
+    private async prepareMetadata(pageContent: PageContent): Promise<MetadataExtraction> {
+        // If extractor already provided rich metadata, use it
+        if (pageContent.metadata.authors || pageContent.metadata.paperStructure) {
+            console.log("✓ Using metadata from extractor");
+            return {
+                description: pageContent.metadata.description || pageContent.abstract || 'No description available',
+                mainTopics: pageContent.metadata.tags || [],
+                keyEntities: [],
+                contentType: pageContent.metadata.contentType,
+                authors: pageContent.metadata.authors,
+                paperStructure: pageContent.metadata.paperStructure,
+            };
+        }
+
+        // Otherwise, extract metadata with AI
+        console.log("⚙️  Extracting metadata with AI...");
+        return await this.extractMetadata(pageContent);
+    }
+
+    /**
      * Step 1: Extract metadata and identify content type
      */
-    private async extractMetadata(pageContent: PageContent): Promise<CondensedPageContent['metadata']> {
+    private async extractMetadata(pageContent: PageContent): Promise<MetadataExtraction> {
         const prompt = CondensePrompts.metadata(pageContent);
 
         try {
@@ -102,10 +132,10 @@ export class CondenseService {
         } catch (error) {
             console.warn("⚠️  Failed to extract metadata, using defaults:", error);
             return {
-                description: pageContent.metaDescription,
-                mainTopics: [],
+                description: pageContent.metadata.description || pageContent.abstract || 'No description available',
+                mainTopics: pageContent.metadata.tags || [],
                 keyEntities: [],
-                contentType: 'article',
+                contentType: pageContent.metadata.contentType || 'generic',
             };
         }
     }
@@ -141,9 +171,14 @@ export class CondenseService {
     }
 
     /**
-     * Process chunks iteratively, condensing each chunk and maintaining context
+     * Process chunks iteratively, building up a condensed summary incrementally
+     * This method maintains a rolling summary that "walks through" the entire content
      */
-    private async processChunksIteratively(chunks: string[], contentType: string): Promise<string> {
+    private async processChunksIteratively(
+        chunks: string[],
+        contentType: string,
+        metadata?: MetadataExtraction
+    ): Promise<string> {
         if (chunks.length === 0) {
             return '';
         }
@@ -155,94 +190,150 @@ export class CondenseService {
             return await this.refineContent(chunks.join('\n\n'), contentType);
         }
 
-        const condensedChunks: string[] = [];
-        let runningContext = '';
+        // Extract paper context for research papers
+        const paperContext = contentType === 'research-paper' && metadata?.paperStructure
+            ? {
+                title: metadata.description || '',
+                mainContribution: metadata.paperStructure.mainContribution,
+                researchQuestion: metadata.paperStructure.researchQuestion,
+                methodology: metadata.paperStructure.methodology
+            }
+            : undefined;
 
+        console.log("🔄 Using incremental summarization strategy...");
+
+        // Step 1: Initialize the condensed summary structure
+        console.log("📋 Initializing condensed summary structure...");
+        let condensedSummary = await this.initializeCondensedSummary(
+            metadata?.description || '',
+            contentType,
+            metadata?.paperStructure
+        );
+        console.log("✓ Initial structure created");
+
+        // Step 2: Incrementally update the summary as we read each chunk
         for (let i = 0; i < chunks.length; i++) {
-            console.log(`  Processing chunk ${i + 1}/${chunks.length} (${chunks[i].length} chars)...`);
+            console.log(`📖 Reading and integrating chunk ${i + 1}/${chunks.length} (${chunks[i].length} chars)...`);
 
-            const condensed = await this.condenseChunk(
+            condensedSummary = await this.updateCondensedSummary(
+                condensedSummary,
                 chunks[i],
-                contentType,
-                runningContext,
                 i,
-                chunks.length
+                chunks.length,
+                contentType,
+                paperContext
             );
 
-            condensedChunks.push(condensed);
-
-            // Update running context with a brief summary of what we've processed so far
-            runningContext = this.updateContext(runningContext, condensed, i);
-
-            console.log(`  ✓ Condensed to ${condensed.length} chars`);
+            console.log(`✓ Summary updated (current length: ${condensedSummary.length} chars)`);
         }
 
-        // Combine all condensed chunks
-        let combined = condensedChunks.join('\n\n');
+        // Step 3: Convert the final structured summary back to text
+        console.log("📝 Converting structured summary to narrative text...");
+        const finalText = await this.convertSummaryToText(condensedSummary, contentType);
+        console.log(`✓ Final condensed text: ${finalText.length} chars`);
 
-        // If still too long, do a final pass to condense further
-        if (combined.length > this.TARGET_CONDENSED_LENGTH) {
-            console.log("📝 Final condensing pass needed...");
-            combined = await this.finalCondense(combined, contentType);
-        }
-
-        return combined;
+        return finalText;
     }
 
     /**
-     * Condense a single chunk with context from previous chunks
+     * Initialize condensed summary structure for incremental building
      */
-    private async condenseChunk(
-        chunk: string,
+    private async initializeCondensedSummary(
+        description: string,
         contentType: string,
-        previousContext: string,
-        chunkIndex: number,
-        totalChunks: number
+        paperStructure?: MetadataExtraction['paperStructure']
     ): Promise<string> {
-        const prompt = CondensePrompts.chunk(chunk, contentType, previousContext, chunkIndex, totalChunks);
+        const paperContext = paperStructure ? {
+            researchQuestion: paperStructure.researchQuestion,
+            mainContribution: paperStructure.mainContribution,
+            methodology: paperStructure.methodology
+        } : undefined;
+
+        const prompt = CondensePrompts.initializeCondensedSummary(
+            description,
+            contentType,
+            paperContext
+        );
 
         try {
-            const condensed = await this.ai.prompt(prompt);
-            return condensed.trim();
+            const structure = await this.ai.prompt(prompt);
+            return structure.trim();
         } catch (error) {
-            console.warn(`⚠️  Failed to condense chunk ${chunkIndex + 1}, using original`);
-            return chunk;
+            console.warn("⚠️  Failed to initialize summary structure, using empty structure");
+            // Return a simple empty structure
+            if (contentType === 'research-paper') {
+                return JSON.stringify({
+                    background: "",
+                    problem: "",
+                    contribution: paperContext?.mainContribution || "",
+                    methodology: paperContext?.methodology || "",
+                    results: "",
+                    conclusion: "",
+                    technical_details: ""
+                });
+            } else {
+                return JSON.stringify({
+                    main_points: "",
+                    details: "",
+                    technical_info: ""
+                });
+            }
         }
     }
 
     /**
-     * Update running context with latest condensed content
+     * Update condensed summary incrementally after reading a chunk
      */
-    private updateContext(currentContext: string, newContent: string, chunkIndex: number): string {
-        // Keep context concise - only maintain key points from previous chunks
-        const contextSnippet = newContent.substring(0, 200);
-
-        if (!currentContext) {
-            return `Chunk ${chunkIndex + 1}: ${contextSnippet}...`;
+    private async updateCondensedSummary(
+        currentSummary: string,
+        newChunk: string,
+        chunkIndex: number,
+        totalChunks: number,
+        contentType: string,
+        paperContext?: {
+            title: string;
+            mainContribution?: string;
+            researchQuestion?: string;
+            methodology?: string;
         }
+    ): Promise<string> {
+        const prompt = CondensePrompts.updateCondensedSummary(
+            currentSummary,
+            newChunk,
+            chunkIndex,
+            totalChunks,
+            contentType,
+            paperContext
+        );
 
-        // Keep only the last 2 chunks in context to avoid token buildup
-        const contexts = currentContext.split('\n');
-        if (contexts.length >= 2) {
-            contexts.shift(); // Remove oldest context
+        try {
+            const updatedSummary = await this.ai.prompt(prompt);
+            return updatedSummary.trim();
+        } catch (error) {
+            console.warn(`⚠️  Failed to update summary for chunk ${chunkIndex + 1}, keeping previous summary`);
+            return currentSummary;
         }
-
-        contexts.push(`Chunk ${chunkIndex + 1}: ${contextSnippet}...`);
-        return contexts.join('\n');
     }
 
     /**
-     * Final condensing pass to ensure content fits target length
+     * Convert structured summary to narrative text
      */
-    private async finalCondense(content: string, contentType: string): Promise<string> {
-        const prompt = CondensePrompts.finalCondense(content, contentType, this.TARGET_CONDENSED_LENGTH);
+    private async convertSummaryToText(structuredSummary: string, contentType: string): Promise<string> {
+        const prompt = CondensePrompts.convertToNarrative(structuredSummary, contentType);
 
         try {
-            const condensed = await this.ai.prompt(prompt);
-            return condensed.trim();
+            const narrative = await this.ai.prompt(prompt);
+            return narrative.trim();
         } catch (error) {
-            console.warn("⚠️  Final condense failed, truncating instead");
-            return this.truncateContent(content, this.TARGET_CONDENSED_LENGTH);
+            console.warn("⚠️  Failed to convert to narrative, using structured form");
+            // If conversion fails, try to extract text from JSON structure
+            try {
+                const obj = JSON.parse(structuredSummary);
+                const parts = Object.values(obj).filter(v => typeof v === 'string' && v.trim());
+                return parts.join('\n\n');
+            } catch {
+                return structuredSummary;
+            }
         }
     }
 
@@ -277,10 +368,10 @@ export class CondenseService {
             url: pageContent.url || '',
             condensedContent: truncated,
             metadata: {
-                description: pageContent.metaDescription,
-                mainTopics: [],
+                description: pageContent.metadata.description || pageContent.abstract || 'No description available',
+                mainTopics: pageContent.metadata.tags || [],
                 keyEntities: [],
-                contentType: 'article',
+                contentType: pageContent.metadata.contentType || 'generic',
             },
             originalLength: rawContent.length,
             condensedLength: truncated.length,

@@ -1,16 +1,18 @@
 import type { PageContent } from '../types';
 
+const MAX_MAIN_CONTENT_LENGTH = 7000;
+
 /**
+ * Extract page content from DOM - generic fallback extractor
  * This function runs in page context (injected via chrome.scripting.executeScript)
- * and extracts useful pieces of content from the DOM. It returns a PageContent
- * object that will be serialized and sent back to the extension background.
- *
+ * 
+ * Converts extracted content to standardized PageContent format
  * Note: This function must only rely on browser globals and DOM APIs since it
  * executes inside the target page (not the extension's context).
  */
 export function extractPageContentFromDOM(): PageContent {
     const title = document.title;
-    const metaDescription = (document.querySelector('meta[name="description"]') as HTMLMetaElement)?.content || "";
+    const description = (document.querySelector('meta[name="description"]') as HTMLMetaElement)?.content || "";
 
     // Extract headings
     const headings = Array.from(document.querySelectorAll('h1, h2, h3, h4, h5, h6'))
@@ -28,40 +30,38 @@ export function extractPageContentFromDOM(): PageContent {
         .filter(src => src.startsWith('http'));
 
     // Extract main content
-    let content = "";
-    let fullText = "";
-
-    // Try to find main content areas
     const mainContent = document.querySelector('main') ||
         document.querySelector('article') ||
         document.querySelector('.content') ||
         document.querySelector('#content') ||
         document.body;
 
-    if (mainContent) {
-        fullText = mainContent.textContent?.trim() || "";
+    const fullText = mainContent?.textContent?.trim() || document.body.textContent?.trim() || "";
 
-        // Extract first few paragraphs as content summary
-        const paragraphs = Array.from(mainContent.querySelectorAll('p'))
-            .map(p => p.textContent?.trim())
-            .filter((text): text is string => Boolean(text) && text.length > 50)
-            .slice(0, 3);
+    // Extract first few paragraphs as short content
+    const paragraphs = Array.from((mainContent || document.body).querySelectorAll('p'))
+        .map(p => p.textContent?.trim())
+        .filter((text): text is string => Boolean(text))
+        .slice(0, 3);
 
-        content = paragraphs.join('\n\n');
-    }
-
-    if (!fullText) {
-        fullText = document.body.textContent?.trim() || "";
-    }
+    const shortContent = paragraphs.join('\n\n');
 
     return {
         title,
         url: window.location.href,
-        content,
+        abstract: undefined,
+        mainContent: shortContent || fullText.substring(0, MAX_MAIN_CONTENT_LENGTH),
         fullText,
-        metaDescription,
-        headings,
-        links: links.slice(0, 10), // Limit to first 10 links
-        images: images.slice(0, 5)  // Limit to first 5 images
+
+        metadata: {
+            description,
+            contentType: 'generic',
+            tags: headings.slice(0, 5),
+        },
+
+        links: links.slice(0, 10),
+        images: images.slice(0, 5),
+
+        extractorType: 'generic'
     };
 }

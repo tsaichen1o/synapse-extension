@@ -69,12 +69,17 @@ function App(): React.JSX.Element {
     const mockPageContent: PageContent = {
         title: "Understanding Large Language Models: A Comprehensive Review",
         url: "https://example.com/paper",
-        fullText: "This paper provides a comprehensive review of Large Language Models (LLMs), tracing their evolution from early neural networks to modern transformer-based architectures. We discuss key innovations, challenges in deployment, and future research directions. Special attention is given to the ethical implications and computational costs associated with training and operating LLMs at scale.",
         abstract: "This paper provides a comprehensive review of Large Language Models (LLMs), tracing their evolution from early neural networks to modern transformer-based architectures. We discuss key innovations, challenges in deployment, and future research directions. Special attention is given to the ethical implications and computational costs associated with training and operating LLMs at scale.",
-        metaDescription: "A comprehensive review of Large Language Models and their implications",
-        headings: ["Introduction", "Methodology", "Results", "Discussion", "Conclusion"],
+        mainContent: "This paper provides a comprehensive review of Large Language Models (LLMs), tracing their evolution from early neural networks to modern transformer-based architectures. We discuss key innovations, challenges in deployment, and future research directions. Special attention is given to the ethical implications and computational costs associated with training and operating LLMs at scale.",
+        fullText: "This paper provides a comprehensive review of Large Language Models (LLMs), tracing their evolution from early neural networks to modern transformer-based architectures. We discuss key innovations, challenges in deployment, and future research directions. Special attention is given to the ethical implications and computational costs associated with training and operating LLMs at scale.",
+        metadata: {
+            description: "A comprehensive review of Large Language Models and their implications",
+            contentType: 'article',
+            tags: ["LLM", "AI", "Machine Learning"],
+        },
         links: ["https://example.com/reference1", "https://example.com/reference2"],
-        images: ["https://example.com/figure1.png", "https://e xample.com/figure2.png"]
+        images: ["https://example.com/figure1.png", "https://example.com/figure2.png"],
+        extractorType: 'generic'
     };
 
     const mockAiSummary = "This paper provides a comprehensive review of Large Language Models (LLMs), tracing their evolution from early neural networks to modern Transformer architectures. It explores key innovations, deployment challenges, future research directions, and ethical and computational cost issues.";

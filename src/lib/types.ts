@@ -5,6 +5,47 @@
  * https://developer.chrome.com/docs/ai/built-in
  */
 
+
+/**
+ * Unified section structure for all content types
+ * Can represent sections in research papers, articles, documentation, etc.
+ */
+export interface ContentSection {
+    /** Heading level (1 = h1, 2 = h2, etc.) */
+    level: number;
+    /** Section title/heading */
+    title: string;
+    /** Section content (plain text or markdown) */
+    content: string;
+    /** Nested subsections */
+    subsections?: ContentSection[];
+    /** Optional section number (e.g., "1", "2.1", "3.2.1") */
+    number?: string;
+    /** Optional section ID for reference */
+    id?: string;
+}
+
+/**
+ * Content type classification
+ */
+export type ContentType =
+    | 'research-paper'
+    | 'article'
+    | 'documentation'
+    | 'blog'
+    | 'wiki'
+    | 'generic';
+
+/**
+ * Paper-specific structured metadata
+ */
+export interface PaperStructure {
+    researchQuestion?: string;
+    mainContribution?: string;
+    methodology?: string;
+    keyFindings?: string;
+}
+
 /**
  * Condensed content structure that's optimized for AI processing
  * This structure significantly reduces token usage while preserving all essential information
@@ -16,10 +57,12 @@ export interface CondensedPageContent {
     condensedContent: string;
     // Key metadata extracted
     metadata: {
-        description?: string;
+        description: string;
         mainTopics: string[];
         keyEntities: string[];
-        contentType: string; // e.g., "article", "documentation", "research-paper", "blog"
+        authors?: string[];
+        contentType: ContentType;
+        paperStructure?: PaperStructure;
     };
     // Original length info for reference
     originalLength: number;
@@ -27,26 +70,57 @@ export interface CondensedPageContent {
     compressionRatio: number;
 }
 
-// Page Content Types
+// ===== Standardized Page Content =====
+
+/**
+ * Standardized page content structure
+ * All extractors must convert their specific formats to this unified structure
+ * AI Services only interact with this interface - they don't need to know about extractor-specific details
+ */
 export interface PageContent {
-    /** Page title, typically document.title */
+    // === Basic Information ===
+    /** Page title */
     title: string;
     /** Page URL */
     url: string;
-    /** A short content snippet or initial paragraphs suitable for summarization */
-    content?: string;
-    /** Optional abstract-like summary if extracted by other means */
+
+    // === Main Content ===
+    /** Abstract or summary (if available) */
     abstract?: string;
-    /** Full text content extracted from the main page area */
+    /** Main content formatted as markdown */
+    mainContent: string;
+    /** Original full text (for reference) */
     fullText: string;
-    /** meta[name="description"] content, if available */
-    metaDescription?: string;
-    /** Array of heading texts (h1..h6) found on the page */
-    headings?: string[];
-    /** Top outbound links found on the page (limited when extracted) */
-    links?: string[];
-    /** Image URLs extracted from the page */
+
+    // === Standardized Metadata ===
+    metadata: {
+        /** Authors (for papers, articles with bylines) */
+        authors?: string[];
+        /** Publication or last modified date */
+        publishDate?: string;
+        /** Content type classification */
+        contentType: ContentType;
+        /** Tags or keywords */
+        tags?: string[];
+        /** Meta description from HTML */
+        description?: string;
+        /** Structured sections (if content has clear sections) */
+        sections?: ContentSection[];
+        /** Research paper specific structure */
+        paperStructure?: PaperStructure;
+        /** Extractor-specific extra data (AI Services should not depend on this) */
+        extra?: Record<string, any>;
+    };
+
+    // === Optional Fields ===
+    /** Image URLs (for image context feature) */
     images?: string[];
+    /** Links (for potential future features) */
+    links?: string[];
+
+    // === Extractor Information ===
+    /** Type of extractor used (for debugging/logging only) */
+    extractorType: 'arxiv' | 'wikipedia' | 'generic' | 'readability';
 }
 
 // Type definitions for structured data

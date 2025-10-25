@@ -28,7 +28,7 @@ export class SummarizeService {
             const isCondensed = 'condensedContent' in input;
             const content = isCondensed
                 ? input.condensedContent
-                : (input.content || input.abstract || input.fullText);
+                : (input.mainContent || input.abstract || input.fullText);
             const title = input.title;
             const metadata = isCondensed ? input.metadata : undefined;
 
@@ -42,7 +42,7 @@ export class SummarizeService {
 
             // Step 2: Extract structured data based on content type
             console.log("🏗️  Step 2: Extracting structured data...");
-            const structuredDataPrompt = SummarizePrompts.structuredData(content, title, extraction);
+            const structuredDataPrompt = SummarizePrompts.structuredData(content, title, extraction, metadata);
             let structuredData = await this.ai.promptStructured<Record<string, any>>(structuredDataPrompt, structuredDataSchema);
             // Normalize structured data to prevent [object Object] display issues
             structuredData = normalizeStructuredData(structuredData);
@@ -78,7 +78,7 @@ export class SummarizeService {
             const isCondensed = 'condensedContent' in input;
             const content = isCondensed
                 ? input.condensedContent
-                : (input.content || input.abstract || input.fullText);
+                : (input.mainContent || input.abstract || input.fullText);
             const title = input.title;
 
             const promptText = SummarizePrompts.fallback(content, title);

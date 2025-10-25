@@ -14,6 +14,14 @@ export class SummarizePrompts {
 Content Type: ${metadata.contentType}
 Main Topics: ${metadata.mainTopics.join(', ')}
 Key Entities: ${metadata.keyEntities.join(', ')}
+${metadata.authors && metadata.authors.length > 0 ? `Authors (MUST include in structured data): ${metadata.authors.join(', ')}` : ''}
+${metadata.paperStructure ? `
+## Research Paper Context:
+${metadata.paperStructure.researchQuestion ? `Research Question: ${metadata.paperStructure.researchQuestion}` : ''}
+${metadata.paperStructure.mainContribution ? `Main Contribution: ${metadata.paperStructure.mainContribution}` : ''}
+${metadata.paperStructure.methodology ? `Methodology: ${metadata.paperStructure.methodology}` : ''}
+${metadata.paperStructure.keyFindings ? `Key Findings: ${metadata.paperStructure.keyFindings}` : ''}
+` : ''}
 ` : '';
 
         return `
@@ -29,14 +37,22 @@ ${content}
 # Your Task
 Analyze this content and extract:
 1. Main topic and purpose
-2. Key themes and concepts (3-5 major themes)
-3. Important facts, data, or findings
+2. Key themes and concepts (1-5 major themes, aim for 3-5 if possible)
+3. Important facts, data, or findings (list what you find, can be empty if none)
 4. Target audience or intended use case
+
+${metadata?.contentType === 'research-paper' ? `
+**SPECIAL INSTRUCTIONS FOR RESEARCH PAPERS**:
+- Focus on identifying the paper's core contribution and novelty
+- Distinguish between background/related work vs. the paper's own contributions
+- Note the experimental setup, datasets, and evaluation metrics
+- Identify limitations and future work mentioned
+` : ''}
 
 Output a JSON object with:
 - mainTopic: brief description of the main topic
-- keyThemes: array of 3-5 key themes
-- importantFacts: array of important facts
+- keyThemes: array of 1-5 key themes
+- importantFacts: array of important facts (empty array if none found)
 - targetAudience: description of target audience
         `.trim();
     }
@@ -44,13 +60,19 @@ Output a JSON object with:
     /**
      * Step 2: Identify and extract structured data based on initial analysis
      */
-    static structuredData(content: string, title: string, extraction: ContentExtraction): string {
+    static structuredData(content: string, title: string, extraction: ContentExtraction, metadata?: CondensedPageContent['metadata']): string {
+        // Special handling for research papers with pre-extracted authors
+        const authorHint = metadata?.authors && metadata.authors.length > 0
+            ? `\n## ⚠️ CRITICAL - AUTHORS ALREADY IDENTIFIED:\n${metadata.authors.join(', ')}\n**You MUST include these authors in the "authors" field.**\n`
+            : '';
+
         return `
 # Step 2: Structured Data Extraction
 
 ## Context from Previous Analysis:
 Main Topic: ${extraction.mainTopic}
 Key Themes: ${extraction.keyThemes.join(', ')}
+${authorHint}
 
 ## Content:
 Title: ${title}
@@ -60,44 +82,58 @@ ${content}
 Extract structured data from the content following the schema below.
 
 ## CRITICAL RULES:
-- You **MUST** output a JSON object matching the exact schema below
-- **ALL** keys must be present in the output
-- For metadata fields (content_type, publication_date, source_domain): use null if not found
-- For list fields: use an empty array [] if no relevant items are found
-- Do **NOT** omit any keys or add extra keys
-- List fields should contain **specific, concrete items only** - avoid vague or generic entries
+1. **Output valid JSON only** - exactly matching the example format below
+2. **Include ALL fields** - use empty arrays [] for fields with no data
+3. **Be specific and concrete** - avoid vague or generic entries
+4. **For papers/articles**: ${metadata?.authors && metadata.authors.length > 0 ? '⚠️ USE THE PRE-IDENTIFIED AUTHORS ABOVE' : 'Authors are priority - check bylines, headers, document start/end'}
 
-## Output Schema:
+## Required Output Format:
+
+Return a JSON object with exactly these fields (copy this structure):
 
 {
-  "authors": ["List of authors or primary contributors"],
-  "organizations": ["Organizations, companies, or institutions mentioned"],
-  "mentioned_people": ["People mentioned in text (excluding authors)"],
-  "locations": ["Geographical locations mentioned"],
-  "key_events": ["Specific named events (e.g., 'Google I/O 2025', 'World War II')"],
-  "external_references": ["External sources, DOIs, papers, or links cited"],
-  
-  "key_concepts": ["Core topics or abstract concepts (e.g., 'Machine Learning', 'Quantum Computing')"],
-  "technologies_tools": ["Specific software, hardware, libraries, frameworks (e.g., 'React', 'TensorFlow', 'AWS')"],
-  "methodologies": ["Algorithms, methods, or approaches (e.g., 'K-means Clustering', 'Agile Development')"],
-  "code_elements": ["Function names, APIs, class names mentioned (e.g., 'cudaMalloc()', 'useState()')"],
-  
-  "problems_discussed": ["Specific challenges or issues addressed (e.g., 'Memory leaks in C++')"],
-  "solutions_proposed": ["Specific solutions or recommendations (e.g., 'Use smart pointers')"],
-  "comparisons": ["Direct A vs B comparisons (e.g., 'Python vs Java', 'SQL vs NoSQL')"],
-  
-  "datasets_mentioned": ["Named datasets (e.g., 'ImageNet', 'MNIST', 'CIFAR-10')"],
-  "data_sources": ["Data providers or platforms (e.g., 'Kaggle', 'U.S. Census Bureau')"],
-  "mentioned_media": ["Books, papers, movies, podcasts referenced (e.g., 'Clean Code', 'The Pragmatic Programmer')"]
+  "authors": [],
+  "organizations": [],
+  "mentioned_people": [],
+  "locations": [],
+  "key_events": [],
+  "external_references": [],
+  "key_concepts": [],
+  "technologies_tools": [],
+  "methodologies": [],
+  "code_elements": [],
+  "problems_discussed": [],
+  "solutions_proposed": [],
+  "comparisons": [],
+  "datasets_mentioned": [],
+  "data_sources": [],
+  "mentioned_media": []
 }
 
+## Field Descriptions:
+- **authors**: Author names or primary contributors ${metadata?.authors && metadata.authors.length > 0 ? '(USE PRE-IDENTIFIED AUTHORS)' : ''}
+- **organizations**: Companies, institutions mentioned
+- **mentioned_people**: People mentioned (excluding authors)
+- **locations**: Geographical locations
+- **key_events**: Named events (e.g., "Google I/O 2025")
+- **external_references**: External sources, DOIs, papers cited
+- **key_concepts**: Core topics (e.g., "Machine Learning")
+- **technologies_tools**: Software, frameworks (e.g., "React", "TensorFlow")
+- **methodologies**: Algorithms, methods (e.g., "K-means Clustering")
+- **code_elements**: Function names, APIs (e.g., "useState()")
+- **problems_discussed**: Specific challenges addressed
+- **solutions_proposed**: Specific solutions or recommendations
+- **comparisons**: A vs B comparisons (e.g., "Python vs Java")
+- **datasets_mentioned**: Named datasets (e.g., "ImageNet")
+- **data_sources**: Data providers (e.g., "Kaggle")
+- **mentioned_media**: Books, papers, podcasts referenced
+
 ## Extraction Guidelines:
-- Be specific: Extract concrete items, not categories. Good: "React", "Vue.js". Bad: "frontend frameworks"
-- Be selective: Only include items explicitly mentioned or clearly implied in the content
-- Use exact names: Preserve proper capitalization and formatting (e.g., "TensorFlow" not "tensorflow")
-- For dates: Extract from metadata, headers, or publication info; use YYYY-MM-DD format
-- For domain: Extract from URL or source information
-- Empty is OK: Many fields will be empty arrays for most content - this is expected and correct
+- **Include ALL 16 fields** in your response (use [] for empty)
+- ${metadata?.authors && metadata.authors.length > 0 ? '**USE PRE-IDENTIFIED AUTHORS** from the metadata above' : '**Prioritize authors** for papers/articles'}
+- **Be specific**: "React" ✓ | "frontend frameworks" ✗
+- **Only include items explicitly mentioned** in the content
+- **Use exact names**: Preserve capitalization
         `.trim();
     }
 

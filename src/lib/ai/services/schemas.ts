@@ -143,7 +143,14 @@ export interface MetadataExtraction {
     description: string;
     mainTopics: string[];
     keyEntities: string[];
-    contentType: "article" | "documentation" | "research-paper" | "blog" | "news" | "tutorial" | "other";
+    authors?: string[];
+    contentType: "article" | "documentation" | "research-paper" | "blog" | "wiki" | "generic";
+    paperStructure?: {
+        researchQuestion?: string;
+        mainContribution?: string;
+        methodology?: string;
+        keyFindings?: string;
+    };
 }
 
 /**
@@ -157,19 +164,28 @@ export const metadataExtractionSchema = {
         },
         mainTopics: {
             type: "array",
-            items: { type: "string" },
-            minItems: 1,
-            maxItems: 5
+            items: { type: "string" }
         },
         keyEntities: {
             type: "array",
-            items: { type: "string" },
-            minItems: 1,
-            maxItems: 5
+            items: { type: "string" }
+        },
+        authors: {
+            type: "array",
+            items: { type: "string" }
         },
         contentType: {
             type: "string",
-            enum: ["article", "documentation", "research-paper", "blog", "news", "tutorial", "other"]
+            enum: ["article", "documentation", "research-paper", "blog", "wiki", "generic"]
+        },
+        paperStructure: {
+            type: "object",
+            properties: {
+                researchQuestion: { type: "string" },
+                mainContribution: { type: "string" },
+                methodology: { type: "string" },
+                keyFindings: { type: "string" }
+            }
         }
     },
     required: ["description", "mainTopics", "keyEntities", "contentType"]
@@ -200,14 +216,11 @@ export const extractionSchema = {
         },
         keyThemes: {
             type: "array",
-            items: { type: "string" },
-            minItems: 3,
-            maxItems: 5
+            items: { type: "string" }
         },
         importantFacts: {
             type: "array",
-            items: { type: "string" },
-            minItems: 1
+            items: { type: "string" }
         },
         targetAudience: {
             type: "string"
@@ -221,28 +234,28 @@ export const extractionSchema = {
  */
 export interface StructuredDataExtraction {
     // Factual entities (Who, What, Where, When)
-    authors: string[];
-    organizations: string[];
-    mentioned_people: string[];
-    locations: string[];
-    key_events: string[];
-    external_references: string[];
+    authors?: string[];
+    organizations?: string[];
+    mentioned_people?: string[];
+    locations?: string[];
+    key_events?: string[];
+    external_references?: string[];
 
     // Conceptual & Technical entities (How, Why)
-    key_concepts: string[];
-    technologies_tools: string[];
-    methodologies: string[];
-    code_elements: string[];
+    key_concepts?: string[];
+    technologies_tools?: string[];
+    methodologies?: string[];
+    code_elements?: string[];
 
     // Relational & Purpose-Driven entities
-    problems_discussed: string[];
-    solutions_proposed: string[];
-    comparisons: string[];
+    problems_discussed?: string[];
+    solutions_proposed?: string[];
+    comparisons?: string[];
 
     // Data & Media entities
-    datasets_mentioned: string[];
-    data_sources: string[];
-    mentioned_media: string[];
+    datasets_mentioned?: string[];
+    data_sources?: string[];
+    mentioned_media?: string[];
 }
 
 /**
@@ -275,6 +288,10 @@ export const structuredDataSchema = {
         data_sources: { type: "array", items: { type: "string" } },
         mentioned_media: { type: "array", items: { type: "string" } }
     },
+    required: [
+        "authors"
+    ],
+    additionalProperties: false
 };
 
 /**
