@@ -5,20 +5,21 @@ import { getPageContent } from "../lib/helper";
 import {
     PageContent,
     StructuredData,
-} from "../lib/types";
-
+    CondensedPageContent
+} from "../lib/types"; 
 
 interface ChatMessage {
     sender: "user" | "ai";
     text: string;
 }
 
-type LoadingPhase = "capturing" | "summarizing" | "chatting" | "saving" | null;
+type LoadingPhase = "capturing" | "condensing" | "summarizing" | "chatting" | "saving" | null;
 
 function App(): React.JSX.Element {
     const [loadingPhase, setLoadingPhase] = useState<LoadingPhase>(null);
     const [currentPageUrl, setCurrentPageUrl] = useState<string>("");
     const [currentPageContent, setCurrentPageContent] = useState<PageContent | null>(null);
+    const [condensedContent, setCondensedContent] = useState<CondensedPageContent | null>(null);
     // original captured summary (before user-AI interactions)
     const [initialSummary, setInitialSummary] = useState<string>("");
     // the latest summary that updates after each AI interaction
@@ -174,13 +175,27 @@ function App(): React.JSX.Element {
         setInitialSummary("");
         setStructuredData({});
         setChatMessages([]);
+        setCondensedContent(null);
 
         try {
+            // Step 1: Capture page content
             const pageContent = await getPageContent();
-            setCurrentPageContent(pageContent); // Store for later use in chat
+            setCurrentPageContent(pageContent);
+            console.log("📄 Page content captured:", pageContent.title);
 
+            // Step 2: Condense content (critical step to avoid token limits!)
+            setLoadingPhase("condensing");
+            console.log("🔄 Condensing content...");
+            const condensed = await aiInstanceRef.current.condense(pageContent);
+            setCondensedContent(condensed);
+            console.log(`✅ Content condensed: ${condensed.originalLength} → ${condensed.condensedLength} chars`);
+            console.log(`   Compression ratio: ${(condensed.compressionRatio * 100).toFixed(1)}%`);
+            console.log(`   Content type: ${condensed.metadata.contentType}`);
+
+            // Step 3: Use condensed content to generate summary
             setLoadingPhase("summarizing");
-            const result = await aiInstanceRef.current.summarize(pageContent);
+            console.log("📝 Generating summary from condensed content...");
+            const result = await aiInstanceRef.current.summarize(condensed);
 
             // store original captured summary and initialize currentSummary
             setInitialSummary(result.summary);
@@ -214,7 +229,7 @@ function App(): React.JSX.Element {
         e.preventDefault();
         if (!chatInput.trim()) return;
 
-        if (!aiInstanceRef.current || !currentPageContent) {
+        if (!aiInstanceRef.current || !condensedContent) {
             setChatMessages((prev: ChatMessage[]) => [
                 ...prev,
                 {
@@ -233,9 +248,11 @@ function App(): React.JSX.Element {
         setLoadingPhase("chatting");
 
         try {
+            console.log("💬 Sending chat with condensed content...");
+            // Use condensed content instead of raw pageContent
             const aiResponse = await aiInstanceRef.current.chat(
-                currentPageContent,
-                initialSummary,
+                condensedContent,
+                currentSummary,
                 structuredData,
                 userMessage.text
             );
@@ -404,6 +421,14 @@ function App(): React.JSX.Element {
                 summary: currentSummary, // Use the latest summary (may be edited via chat)
                 structuredData: structuredData, // Final Key-Value Pairs after AI collaboration
                 chatHistory: chatMessages, // Conversation history
+                // Store condensed content information
+                condensedContent: condensedContent?.condensedContent,
+                contentType: condensedContent?.metadata.contentType,
+                mainTopics: condensedContent?.metadata.mainTopics,
+                keyEntities: condensedContent?.metadata.keyEntities,
+                compressionRatio: condensedContent?.compressionRatio,
+                originalLength: condensedContent?.originalLength,
+                condensedLength: condensedContent?.condensedLength,
                 createdAt: existingNode ? existingNode.createdAt : new Date(),
                 updatedAt: new Date(),
             };
@@ -474,6 +499,7 @@ function App(): React.JSX.Element {
         setChatMessages([]);
         setHasUserInteracted(false);
         setCurrentPageContent(null);
+        setCondensedContent(null);
         setLoadingPhase(null);
         setChatInput("");
 
@@ -568,6 +594,13 @@ function App(): React.JSX.Element {
                             </svg>
                             <span>Capturing page content...</span>
                         </>
+                    ) : loadingPhase === "condensing" ? (
+                        <>
+                            <svg className="animate-pulse h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                            </svg>
+                            <span>Condensing content...</span>
+                        </>
                     ) : loadingPhase === "summarizing" ? (
                         <>
                             <svg className="animate-pulse h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -588,6 +621,48 @@ function App(): React.JSX.Element {
 
             <div className={`transition-all duration-500 ${hasUserInteracted ? 'flex flex-row gap-6' : 'flex flex-col'}`}>
                 <div className={`transition-all duration-500 ${hasUserInteracted ? 'w-1/2' : 'w-full'}`}>
+                    {condensedContent && (
+                        <div className="mb-4 animate-fadeIn">
+                            <div className="p-4 bg-gradient-to-r from-blue-50/80 to-purple-50/80 backdrop-blur-md rounded-2xl border border-blue-200/50 shadow-md">
+                                <div className="flex items-center gap-2 mb-2">
+                                    <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                    </svg>
+                                    <span className="text-xs font-semibold text-blue-600 uppercase tracking-wide">Content Optimized</span>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2 text-xs">
+                                    <div className="bg-white/50 rounded-lg px-2 py-1">
+                                        <span className="text-gray-500">Type:</span>
+                                        <span className="ml-1 font-semibold text-gray-700">{condensedContent.metadata.contentType}</span>
+                                    </div>
+                                    <div className="bg-white/50 rounded-lg px-2 py-1">
+                                        <span className="text-gray-500">Compression:</span>
+                                        <span className="ml-1 font-semibold text-green-600">{(condensedContent.compressionRatio * 100).toFixed(0)}%</span>
+                                    </div>
+                                    <div className="bg-white/50 rounded-lg px-2 py-1">
+                                        <span className="text-gray-500">Original:</span>
+                                        <span className="ml-1 font-semibold text-gray-700">{condensedContent.originalLength.toLocaleString()} chars</span>
+                                    </div>
+                                    <div className="bg-white/50 rounded-lg px-2 py-1">
+                                        <span className="text-gray-500">Optimized:</span>
+                                        <span className="ml-1 font-semibold text-blue-600">{condensedContent.condensedLength.toLocaleString()} chars</span>
+                                    </div>
+                                </div>
+                                {condensedContent.metadata.mainTopics.length > 0 && (
+                                    <div className="mt-2 pt-2 border-t border-blue-200/50">
+                                        <div className="flex flex-wrap gap-1">
+                                            {condensedContent.metadata.mainTopics.slice(0, 3).map((topic, idx) => (
+                                                <span key={idx} className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
+                                                    {topic}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                    
                     {initialSummary && !hasUserInteracted && (
                         <div className="mb-6 animate-fadeIn">
                             <div className="flex items-center gap-2 mb-3">
