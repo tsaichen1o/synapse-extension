@@ -7,6 +7,7 @@ import {
     summaryResponseSchema
 } from './schemas';
 import type { ContentExtraction } from './schemas';
+import { SummarizePrompts } from '../prompts';
 
 /**
  * Summarization service that uses an AI instance with multi-step iterative refinement
@@ -14,100 +15,6 @@ import type { ContentExtraction } from './schemas';
  */
 export class SummarizeService {
     constructor(private ai: AI) { }
-
-    /**
-     * Step 1: Extract key points and main themes from the content
-     */
-    private buildExtractionPrompt(content: string, title: string, metadata?: CondensedPageContent['metadata']): string {
-        const metadataInfo = metadata ? `
-## Pre-extracted Metadata:
-Content Type: ${metadata.contentType}
-Main Topics: ${metadata.mainTopics.join(', ')}
-Key Entities: ${metadata.keyEntities.join(', ')}
-` : '';
-
-        return `
-# Step 1: Content Extraction and Initial Analysis
-
-## Page Information:
-Title: ${title}
-${metadataInfo}
-
-## Content:
-${content}
-
-# Your Task
-Analyze this content and extract:
-1. Main topic and purpose
-2. Key themes and concepts (3-5 major themes)
-3. Important facts, data, or findings
-4. Target audience or intended use case
-
-Output a JSON object with:
-- mainTopic: brief description of the main topic
-- keyThemes: array of 3-5 key themes
-- importantFacts: array of important facts
-- targetAudience: description of target audience
-        `.trim();
-    }
-
-    /**
-     * Step 2: Identify and extract structured data based on initial analysis
-     */
-    private buildStructuredDataPrompt(content: string, title: string, extraction: ContentExtraction): string {
-        return `
-# Step 2: Structured Data Extraction
-
-## Context from Previous Analysis:
-Main Topic: ${extraction.mainTopic}
-Key Themes: ${extraction.keyThemes.join(', ')}
-
-## Content:
-Title: ${title}
-${content}
-
-# Your Task
-Based on the page type and content, extract the most relevant structured information.
-Adapt your extraction to the content type (e.g., research paper, blog post, documentation, news article).
-
-For research papers, extract: Authors, Year, Methodology, Key Findings, Citations
-For blog posts, extract: Author, Date, Category, Tags, Key Takeaways
-For documentation, extract: Version, Language, Framework, Key Features, Prerequisites
-For news articles, extract: Date, Category, Location, People Mentioned, Key Events
-
-Output a JSON object with relevant key-value pairs. Values can be strings, arrays, or numbers as appropriate.
-Ensure at least one key-value pair is included.
-        `.trim();
-    }
-
-    /**
-     * Step 3: Generate a polished summary incorporating all previous analysis
-     */
-    private buildSummaryPrompt(content: string, extraction: ContentExtraction, structuredData: any): string {
-        return `
-# Step 3: Final Summary Generation
-
-## Context from Previous Steps:
-Main Topic: ${extraction.mainTopic}
-Key Themes: ${extraction.keyThemes.join(', ')}
-
-## Structured Data Extracted:
-${JSON.stringify(structuredData, null, 2)}
-
-## Content:
-${content}
-
-# Your Task
-Write a concise, informative summary (150-300 words) that:
-1. Clearly states the main topic and purpose
-2. Highlights key themes and important findings
-3. Is coherent and flows naturally
-4. Uses professional yet accessible language
-5. Captures the essence without unnecessary details
-
-Return ONLY the summary text (no JSON, no markdown, just the summary paragraph).
-        `.trim();
-    }
 
     /**
      * Summarize page content using multi-step iterative refinement
@@ -129,13 +36,13 @@ Return ONLY the summary text (no JSON, no markdown, just the summary paragraph).
 
             // Step 1: Extract key information and themes
             console.log("📊 Step 1: Extracting key themes and concepts...");
-            const extractionPrompt = this.buildExtractionPrompt(content, title, metadata);
+            const extractionPrompt = SummarizePrompts.extraction(content, title, metadata);
             const extraction = await this.ai.promptStructured<ContentExtraction>(extractionPrompt, extractionSchema);
             console.log("✓ Extraction complete:", extraction);
 
             // Step 2: Extract structured data based on content type
             console.log("🏗️  Step 2: Extracting structured data...");
-            const structuredDataPrompt = this.buildStructuredDataPrompt(content, title, extraction);
+            const structuredDataPrompt = SummarizePrompts.structuredData(content, title, extraction);
             let structuredData = await this.ai.promptStructured<Record<string, any>>(structuredDataPrompt, structuredDataSchema);
             // Normalize structured data to prevent [object Object] display issues
             structuredData = normalizeStructuredData(structuredData);
@@ -143,7 +50,7 @@ Return ONLY the summary text (no JSON, no markdown, just the summary paragraph).
 
             // Step 3: Generate comprehensive summary
             console.log("✍️  Step 3: Generating polished summary...");
-            const summaryPrompt = this.buildSummaryPrompt(content, extraction, structuredData);
+            const summaryPrompt = SummarizePrompts.summary(content, extraction, structuredData);
             let summary = await this.ai.prompt(summaryPrompt);
             summary = summary.trim();
             console.log("✓ Summary generated");
@@ -174,16 +81,7 @@ Return ONLY the summary text (no JSON, no markdown, just the summary paragraph).
                 : (input.content || input.abstract || input.fullText);
             const title = input.title;
 
-            const promptText = `
-Analyze this content and provide a summary (150-300 words) and key structured information.
-
-Title: ${title}
-Content: ${content}
-
-Output a JSON object with:
-- summary: your summary here (150-300 words)
-- structuredData: object with relevant key-value pairs
-            `.trim();
+            const promptText = SummarizePrompts.fallback(content, title);
 
             const jsonResult = await this.ai.promptStructured<SummaryResponse>(promptText, summaryResponseSchema);
             return {

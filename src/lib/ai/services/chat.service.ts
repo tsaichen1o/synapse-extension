@@ -8,6 +8,7 @@ import {
     chatResponseSchema
 } from './schemas';
 import type { IntentAnalysis, Modification, ResponseGeneration } from './schemas';
+import { ChatPrompts } from '../prompts';
 
 /**
  * Chat service that uses an AI instance with multi-step iterative processing
@@ -15,128 +16,6 @@ import type { IntentAnalysis, Modification, ResponseGeneration } from './schemas
  */
 export class ChatService {
     constructor(private ai: AI) { }
-
-    /**
-     * Step 1: Understand user intent and what needs to be modified
-     */
-    private buildIntentAnalysisPrompt(
-        input: PageContent | CondensedPageContent,
-        currentSummary: string,
-        currentStructuredData: StructuredData,
-        userMessage: string
-    ): string {
-        return `
-# Step 1: Understand User Intent
-
-## Current State:
-Summary: ${currentSummary}...
-Structured Data Keys: ${Object.keys(currentStructuredData).join(', ')}
-
-## User Message:
-"${userMessage}"
-
-# Your Task
-Analyze the user's message and determine:
-1. What is the user asking for? (question, modification, addition, removal, clarification)
-2. What specific parts need to change? (summary, structured data, or both)
-3. What information from the original content is relevant?
-
-Output a JSON object with:
-- intentType: one of "question", "modify_summary", "modify_data", "add_info", "remove_info", "clarify"
-- targetArea: one of "summary", "structuredData", "both", "none"
-- specificChanges: array of specific changes needed
-- needsOriginalContent: boolean indicating if original content is needed
-- userExpectation: brief description of what user expects as output
-        `.trim();
-    }
-
-    /**
-     * Step 2: Execute modifications based on intent analysis
-     */
-    private buildModificationPrompt(
-        content: string,
-        currentSummary: string,
-        currentStructuredData: StructuredData,
-        userMessage: string,
-        intent: IntentAnalysis
-    ): string {
-        const relevantContent = intent.needsOriginalContent
-            ? `\n## Original Content Reference:\n${content}`
-            : '';
-
-        return `
-# Step 2: Execute Modifications
-
-## Intent Analysis:
-- User wants: ${intent.intentType}
-- Target area: ${intent.targetArea}
-- Specific changes: ${intent.specificChanges.join(', ')}
-- User expectation: ${intent.userExpectation}
-
-## Current Summary:
-${currentSummary}
-
-## Current Structured Data:
-${JSON.stringify(currentStructuredData, null, 2)}
-${relevantContent}
-
-## User Request:
-"${userMessage}"
-
-# Your Task
-Based on the intent analysis, make the requested changes:
-- If modifying summary: Rewrite the affected parts while keeping the rest intact
-- If modifying structured data: Update, add, or remove the relevant key-value pairs
-- If answering a question: Prepare a helpful response
-- Ensure changes are accurate and align with the original content when applicable
-
-Output a JSON object with:
-- modifiedSummary: the updated summary or unchanged if not modified
-- modifiedStructuredData: object with updated structured data or unchanged if not modified
-- changeDescription: brief description of what was changed
-        `.trim();
-    }
-
-    /**
-     * Step 3: Generate user-facing response and validate changes
-     */
-    private buildResponseGenerationPrompt(
-        userMessage: string,
-        intent: IntentAnalysis,
-        modifications: Modification,
-        originalSummary: string,
-        originalStructuredData: StructuredData
-    ): string {
-        return `
-# Step 3: Generate User Response and Validate
-
-## User Message:
-"${userMessage}"
-
-## Intent:
-${intent.intentType} - ${intent.userExpectation}
-
-## Changes Made:
-${modifications.changeDescription}
-
-## Before and After:
-Summary changed: ${modifications.modifiedSummary !== originalSummary ? 'Yes' : 'No'}
-Structured data changed: ${JSON.stringify(modifications.modifiedStructuredData) !== JSON.stringify(originalStructuredData) ? 'Yes' : 'No'}
-
-# Your Task
-1. Verify the changes are appropriate and complete
-2. Generate a natural, conversational response to the user that:
-   - Acknowledges their request
-   - Explains what was changed (if anything)
-   - Answers their question (if it was a question)
-   - Is friendly and helpful
-
-Output a JSON object with:
-- aiResponse: your conversational response to the user
-- changesValid: boolean indicating if changes are valid
-- validationNotes: any concerns or notes about the changes
-        `.trim();
-    }
 
     /**
      * Chat with AI to refine summaries and structured data using multi-step processing
@@ -162,27 +41,14 @@ Output a JSON object with:
 
             // Step 1: Analyze user intent
             console.log("🧠 Step 1: Analyzing user intent...");
-            const intentPrompt = this.buildIntentAnalysisPrompt(
-                input,
-                currentSummary,
-                currentStructuredData,
-                userMessage
-            );
+            const intentPrompt = ChatPrompts.intentAnalysis(input, currentSummary, currentStructuredData, userMessage);
             const intent = await this.ai.promptStructured<IntentAnalysis>(intentPrompt, intentAnalysisSchema);
             console.log("✓ Intent analysis:", intent);
 
             // If user is just asking a question without modifications, skip to response
             if (intent.intentType === 'question' && intent.targetArea === 'none') {
                 console.log("❓ User is asking a question, generating direct response...");
-                const directResponsePrompt = `
-Context: ${currentSummary}
-Structured Data: ${JSON.stringify(currentStructuredData)}
-Original Content: ${content}
-
-User Question: "${userMessage}"
-
-Provide a helpful, accurate answer based on the context and original content.
-                `.trim();
+                const directResponsePrompt = ChatPrompts.directQuestion(currentSummary, currentStructuredData, content, userMessage);
 
                 const directResponse = await this.ai.prompt(directResponsePrompt);
                 return {
@@ -194,25 +60,13 @@ Provide a helpful, accurate answer based on the context and original content.
 
             // Step 2: Execute modifications
             console.log("⚙️  Step 2: Executing modifications...");
-            const modificationPrompt = this.buildModificationPrompt(
-                content,
-                currentSummary,
-                currentStructuredData,
-                userMessage,
-                intent
-            );
+            const modificationPrompt = ChatPrompts.modification(content, currentSummary, currentStructuredData, userMessage, intent);
             const modifications = await this.ai.promptStructured<Modification>(modificationPrompt, modificationSchema);
             console.log("✓ Modifications complete:", modifications.changeDescription);
 
             // Step 3: Generate user response and validate
             console.log("✅ Step 3: Generating user response and validating...");
-            const responsePrompt = this.buildResponseGenerationPrompt(
-                userMessage,
-                intent,
-                modifications,
-                currentSummary,
-                currentStructuredData
-            );
+            const responsePrompt = ChatPrompts.responseGeneration(userMessage, intent, modifications, currentSummary, currentStructuredData);
             const responseData = await this.ai.promptStructured<ResponseGeneration>(responsePrompt, responseGenerationSchema);
             console.log("✓ Response generated");
 
@@ -252,24 +106,8 @@ Provide a helpful, accurate answer based on the context and original content.
                 ? input.condensedContent
                 : (input.content || input.abstract || input.fullText);
             const title = input.title;
-            const structuredDataString = JSON.stringify(currentStructuredData, null, 2);
 
-            const promptText = `
-You are helping refine a web page summary and structured data.
-
-Current Summary: ${currentSummary}
-Current Structured Data: ${structuredDataString}
-Original Content: ${title} - ${content}
-
-User Request: "${userMessage}"
-
-Update the summary and structured data according to the user's request, or answer their question.
-
-Output a JSON object with:
-- summary: updated or unchanged summary
-- structuredData: object with updated or unchanged data
-- aiResponse: your conversational response to the user
-            `.trim();
+            const promptText = ChatPrompts.fallback(content, title, currentSummary, currentStructuredData, userMessage);
 
             const jsonResult = await this.ai.promptStructured<ChatResponse>(promptText, chatResponseSchema);
 
