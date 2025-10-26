@@ -85,18 +85,30 @@ export function extractAmazonProduct(doc: Document): PageContent | null {
     // Extract detailed specifications - This is critical for laptops
     const specs: Record<string, string> = {};
 
-    // Method 1: Technical Details table
-    const techDetailsRows = doc.querySelectorAll('#prodDetails table tr, #technicalSpecifications_section_1 tr');
-    techDetailsRows.forEach(row => {
-        const th = row.querySelector('th');
-        const td = row.querySelector('td');
-        if (th && td) {
-            const key = th.textContent?.trim() || '';
-            const value = td.textContent?.trim() || '';
-            if (key && value) {
-                specs[key] = value;
+    // Method 1: Primary Technical Details tables with specific IDs
+    // These are the most important tables containing detailed product specifications
+    const techSpecSelectors = [
+        '#productDetails_techSpec_section_1 tr',  // Summary section
+        '#productDetails_techSpec_section_2 tr',  // Other Technical Details section
+        '#productDetails_detailBullets_sections1 tr', // Additional Information section
+        '#technicalSpecifications_section_1 tr',  // Alternative technical specs
+        '#prodDetails table tr',                   // General product details
+    ];
+
+    techSpecSelectors.forEach(selector => {
+        const rows = doc.querySelectorAll(selector);
+        rows.forEach(row => {
+            const th = row.querySelector('th');
+            const td = row.querySelector('td');
+            if (th && td) {
+                const key = th.textContent?.trim() || '';
+                const value = td.textContent?.trim() || '';
+                // Filter out non-spec rows (like Customer Reviews, Best Sellers Rank, etc.)
+                if (key && value && !key.includes('Customer Reviews') && !key.includes('Best Sellers Rank') && !key.includes('Date First Available')) {
+                    specs[key] = value;
+                }
             }
-        }
+        });
     });
 
     // Method 2: Product Overview table (often has key specs)
@@ -112,21 +124,23 @@ export function extractAmazonProduct(doc: Document): PageContent | null {
         }
     });
 
-    // Method 3: Extract from structured data (JSON-LD)
-    try {
-        const scriptTags = doc.querySelectorAll('script[type="application/ld+json"]');
-        scriptTags.forEach(script => {
-            try {
-                const jsonData = JSON.parse(script.textContent || '');
-                if (jsonData['@type'] === 'Product' && jsonData.brand) {
-                    if (!brand) brand = jsonData.brand?.name || jsonData.brand;
+    // Method 3: Extract brand from structured data (JSON-LD) if not found yet
+    if (!brand) {
+        try {
+            const scriptTags = doc.querySelectorAll('script[type="application/ld+json"]');
+            scriptTags.forEach(script => {
+                try {
+                    const jsonData = JSON.parse(script.textContent || '');
+                    if (jsonData['@type'] === 'Product' && jsonData.brand) {
+                        brand = jsonData.brand?.name || jsonData.brand;
+                    }
+                } catch (e) {
+                    // Ignore parsing errors for individual scripts
                 }
-            } catch (e) {
-                // Ignore parsing errors for individual scripts
-            }
-        });
-    } catch (e) {
-        // Ignore errors
+            });
+        } catch (e) {
+            // Ignore errors
+        }
     }
 
     // Parse specifications from feature bullets for laptops
@@ -190,13 +204,12 @@ export function extractAmazonProduct(doc: Document): PageContent | null {
 
     const mainContent = contentParts.filter(Boolean).join('\n');
 
-    return {
+    const ret: PageContent = {
         title,
         url: doc.location.href.split('?')[0], // Remove query parameters
         abstract: features.length > 0 ? features[0] : undefined,
         mainContent,
         fullText: mainContent,
-
         metadata: {
             description: description || features.join(' '),
             contentType: 'article', // Using 'article' as the closest standard type
@@ -210,14 +223,14 @@ export function extractAmazonProduct(doc: Document): PageContent | null {
                 rating,
                 reviewCount,
                 availability,
-                specifications: specs,
                 features: features,
+                ...specs,
             }
         },
-
         images: [...new Set(images)],
         links: [], // Product pages don't typically have many relevant external links
-
         extractorType: 'generic' // Using 'generic' as the base type
     };
+    console.log(ret);
+    return ret;
 }

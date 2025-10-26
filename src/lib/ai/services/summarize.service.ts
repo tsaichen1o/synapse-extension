@@ -47,7 +47,6 @@ export class SummarizeService {
                 template,
                 metadata
             );
-            this.appendPreExtractedMetadata(structuredData, metadata);
             if (this.onProgress) this.onProgress(2, totalSteps);
 
             let summary = await this.generateSummary(content, structuredData, template, metadata);
@@ -56,41 +55,15 @@ export class SummarizeService {
 
             return {
                 summary: summary,
-                structuredData: normalizeStructuredData(structuredData),
+                structuredData: {
+                    ...normalizeStructuredData(structuredData),
+                    ...input.metadata.extra
+                },
             };
 
         } catch (error) {
             console.error("❌ Error in 2-step summarize:", error);
             throw error;
-        }
-    }
-
-    /**
-     * Append pre-extracted structured metadata directly to structured data
-     * These are already accurate and structured - no need for AI to re-process
-     */
-    private appendPreExtractedMetadata(
-        structuredData: Record<string, any>,
-        metadata: CondensedPageContent['metadata']
-    ): void {
-        // For research papers, add references and academic metadata
-        if (metadata.contentType === 'research-paper') {
-            // Add top references (論文標題列表)
-            if (metadata.topReferences && metadata.topReferences.length > 0) {
-                console.log("📚 Appending pre-extracted references...");
-                structuredData.key_references = metadata.topReferences.slice(0, 5).map(ref => {
-                    return ref.title ||
-                        ref.label ||
-                        `${ref.authors?.join(', ') || 'Unknown'} (${ref.year || 'n.d.'})`;
-                });
-                console.log(`  ✓ Added ${structuredData.key_references.length} key references`);
-            }
-
-            // Add total reference count
-            if (metadata.totalReferences) {
-                structuredData.total_references = metadata.totalReferences;
-                console.log(`  ✓ Total references: ${metadata.totalReferences}`);
-            }
         }
     }
 

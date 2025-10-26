@@ -18,8 +18,8 @@ export class SummarizePrompts {
     const metadataInfo = metadata ? `
 ## Pre-extracted Metadata:
 Content Type: ${metadata.contentType}
-Main Topics: ${metadata.mainTopics.join(', ')}
-Key Entities: ${metadata.keyEntities.join(', ')}
+${metadata.tags && metadata.tags.length > 0 ? `Tags/Topics: ${metadata.tags.join(', ')}` : ''}
+${metadata.description ? `Description: ${metadata.description}` : ''}
 ${metadata.authors && metadata.authors.length > 0 ? `Authors (MUST include in structured data): ${metadata.authors.join(', ')}` : ''}
 ${metadata.paperStructure ? `
 ## Research Paper Context:
@@ -71,8 +71,8 @@ ${metadata?.authors && metadata.authors.length > 0 ? `\n⚠️ **CRITICAL**: The
 # Summary Generation
 
 ## Pre-extracted Metadata:
-Main Topics: ${metadata.mainTopics.join(', ')}
-Key Entities: ${metadata.keyEntities.join(', ')}
+${metadata.tags && metadata.tags.length > 0 ? `Tags/Topics: ${metadata.tags.join(', ')}` : ''}
+${metadata.description ? `Description: ${metadata.description}` : ''}
 Content Type: ${metadata.contentType}
 
 ## Structured Data Extracted:
