@@ -70,9 +70,9 @@ function App(): React.JSX.Element {
     }, [justUpdated]);
 
     useEffect(() => {
-        // Handle tab change events to update the current URL
+        // Handle tab change events to update the current URL, but only when idle.
         const updateCurrentUrl = () => {
-            if (!initialSummary) {
+            if (loadingPhase === null && !initialSummary) {
                 chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
                     if (tabs[0] && tabs[0].url && tabs[0].url !== currentPageUrl) {
                         setCurrentPageUrl(tabs[0].url);
@@ -87,7 +87,7 @@ function App(): React.JSX.Element {
 
         const handleTabUpdated = (tabId: number, changeInfo: { url?: string }, tab: chrome.tabs.Tab) => {
             if (tab.active && changeInfo.url) {
-                if (!initialSummary) {
+                if (loadingPhase === null && !initialSummary) {
                     setCurrentPageUrl(changeInfo.url);
                 }
             }
@@ -108,7 +108,7 @@ function App(): React.JSX.Element {
                 aiInstanceRef.current = null;
             }
         };
-    }, [initialSummary, currentPageUrl]);
+    }, [initialSummary, currentPageUrl, loadingPhase]);
 
     // Handle AI initialization triggered by user gesture
     const handleInitializeAI = async (): Promise<void> => {
