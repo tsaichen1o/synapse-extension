@@ -102,13 +102,19 @@ function App(): React.JSX.Element {
         return () => {
             chrome.tabs.onActivated.removeListener(handleTabActivated);
             chrome.tabs.onUpdated.removeListener(handleTabUpdated);
+        };
+    }, [initialSummary, currentPageUrl, loadingPhase]);
+
+    // Cleanup AI instance on unmount
+    useEffect(() => {
+        return () => {
             if (aiInstanceRef.current) {
                 console.log("Destroying AI instance on unmount");
                 aiInstanceRef.current.destroy();
                 aiInstanceRef.current = null;
             }
         };
-    }, [initialSummary, currentPageUrl, loadingPhase]);
+    }, []);
 
     // Handle AI initialization triggered by user gesture
     const handleInitializeAI = async (): Promise<void> => {
@@ -499,7 +505,7 @@ function App(): React.JSX.Element {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50 p-6">
+        <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50 px-6 pb-6 pt-12">
             <Header />
 
             <URLDisplay url={currentPageUrl} />
