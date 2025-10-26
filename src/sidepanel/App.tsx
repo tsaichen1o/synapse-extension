@@ -6,7 +6,7 @@ import {
     PageContent,
     StructuredData,
     CondensedPageContent
-} from "../lib/types"; 
+} from "../lib/types";
 
 interface ChatMessage {
     sender: "user" | "ai";
@@ -65,38 +65,9 @@ function App(): React.JSX.Element {
         }
     }, [justUpdated]);
 
-    //  --- IGNORE ---
-    const mockPageContent: PageContent = {
-        title: "Understanding Large Language Models: A Comprehensive Review",
-        url: "https://example.com/paper",
-        abstract: "This paper provides a comprehensive review of Large Language Models (LLMs), tracing their evolution from early neural networks to modern transformer-based architectures. We discuss key innovations, challenges in deployment, and future research directions. Special attention is given to the ethical implications and computational costs associated with training and operating LLMs at scale.",
-        mainContent: "This paper provides a comprehensive review of Large Language Models (LLMs), tracing their evolution from early neural networks to modern transformer-based architectures. We discuss key innovations, challenges in deployment, and future research directions. Special attention is given to the ethical implications and computational costs associated with training and operating LLMs at scale.",
-        fullText: "This paper provides a comprehensive review of Large Language Models (LLMs), tracing their evolution from early neural networks to modern transformer-based architectures. We discuss key innovations, challenges in deployment, and future research directions. Special attention is given to the ethical implications and computational costs associated with training and operating LLMs at scale.",
-        metadata: {
-            description: "A comprehensive review of Large Language Models and their implications",
-            contentType: 'article',
-            tags: ["LLM", "AI", "Machine Learning"],
-        },
-        links: ["https://example.com/reference1", "https://example.com/reference2"],
-        images: ["https://example.com/figure1.png", "https://example.com/figure2.png"],
-        extractorType: 'generic'
-    };
-
-    const mockAiSummary = "This paper provides a comprehensive review of Large Language Models (LLMs), tracing their evolution from early neural networks to modern Transformer architectures. It explores key innovations, deployment challenges, future research directions, and ethical and computational cost issues.";
-
-    const mockStructuredData: StructuredData = {
-        "Paper Type": "Comprehensive Review",
-        "Main Topic": "Large Language Models (LLMs)",
-        "Key Innovations Discussed": [
-            "Transformer-based architectures",
-            "Ethical implications",
-        ],
-        "Challenges": ["Deployment", "Computational costs"],
-    };
-
     useEffect(() => {
         // Handle tab change events to update the current URL
-        const updateCurrentUrl = () => {            
+        const updateCurrentUrl = () => {
             if (!initialSummary) {
                 chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
                     if (tabs[0] && tabs[0].url && tabs[0].url !== currentPageUrl) {
@@ -662,7 +633,7 @@ function App(): React.JSX.Element {
                             </div>
                         </div>
                     )}
-                    
+
                     {initialSummary && !hasUserInteracted && (
                         <div className="mb-6 animate-fadeIn">
                             <div className="flex items-center gap-2 mb-3">
