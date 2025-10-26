@@ -1,5 +1,5 @@
-import type { ContentExtraction } from '../services/schemas';
-import type { CondensedPageContent } from '../../types';
+import type { ContentExtraction } from '../schemas';
+import type { CondensedPageContent } from '../../../types';
 
 /**
  * Prompt templates for SummarizeService

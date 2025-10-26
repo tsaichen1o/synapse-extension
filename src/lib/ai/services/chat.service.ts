@@ -8,7 +8,7 @@ import {
     chatResponseSchema
 } from './schemas';
 import type { IntentAnalysis, Modification, ResponseGeneration } from './schemas';
-import { ChatPrompts } from '../prompts';
+import { ChatPrompts } from './prompts';
 
 /**
  * Chat service that uses an AI instance with multi-step iterative processing

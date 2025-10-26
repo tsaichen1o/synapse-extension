@@ -1,5 +1,5 @@
-import type { IntentAnalysis, Modification } from '../services/schemas';
-import type { PageContent, CondensedPageContent, StructuredData } from '../../types';
+import type { IntentAnalysis, Modification } from '../schemas';
+import type { PageContent, CondensedPageContent, StructuredData } from '../../../types';
 
 /**
  * Prompt templates for ChatService

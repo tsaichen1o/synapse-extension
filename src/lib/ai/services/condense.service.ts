@@ -2,7 +2,7 @@ import type { AI } from '../ai';
 import type { PageContent, CondensedPageContent } from '../../types';
 import { metadataExtractionSchema } from './schemas';
 import type { MetadataExtraction } from './schemas';
-import { CondensePrompts } from '../prompts';
+import { CondensePrompts } from './prompts';
 
 
 /**

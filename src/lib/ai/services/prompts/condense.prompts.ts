@@ -1,4 +1,4 @@
-import type { PageContent } from '../../types';
+import type { PageContent } from '../../../types';
 
 /**
  * Prompt templates for CondenseService

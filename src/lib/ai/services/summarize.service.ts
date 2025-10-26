@@ -7,7 +7,7 @@ import {
     summaryResponseSchema
 } from './schemas';
 import type { ContentExtraction } from './schemas';
-import { SummarizePrompts } from '../prompts';
+import { SummarizePrompts } from './prompts';
 
 /**
  * Summarization service that uses an AI instance with multi-step iterative refinement
