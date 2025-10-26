@@ -366,7 +366,7 @@ export class CondenseService {
             const refined = await this.ai.prompt(prompt);
             return refined.trim();
         } catch (error) {
-            console.warn("⚠️  Refinement failed, using original");
+            console.warn("⚠️  Refinement failed, using original", error);
             return content;
         }
     }
