@@ -16,7 +16,16 @@ import { AIErrors } from '../../errors';
  * Step 2: Generate summary (single AI call)
  */
 export class SummarizeService {
+    private onProgress?: (current: number, total: number) => void;
+
     constructor(private ai: AI) { }
+
+    /**
+     * Set progress callback for real-time progress updates
+     */
+    setProgressCallback(callback: (current: number, total: number) => void): void {
+        this.onProgress = callback;
+    }
 
     /**
      * Summarize condensed page content using 2-step processing
@@ -26,42 +35,26 @@ export class SummarizeService {
      */
     async summarize(input: CondensedPageContent): Promise<SummaryResponse> {
         try {
-            console.log("🔄 Starting 2-step summarization process...");
-
+            const totalSteps = 2 + 1;
             const content = input.condensedContent;
             const title = input.title;
             const metadata = input.metadata;
-
-            // Get content type for template selection
             const contentType = metadata.contentType;
             const template = getTemplate(contentType);
+            if (this.onProgress) this.onProgress(1, totalSteps);
 
-            console.log(`📦 Condensed content: ${content.length} chars`);
-            console.log(`📋 Template: ${template.name} (${template.fields.length} fields)`);
-
-            // Step 1: Combined extraction - get themes AND structured data in one call
-            console.log("📊 Step 1: Extracting themes and structured data (combined)...");
             const { themes, structuredData } = await this.extractCombined(
                 content,
                 title,
                 template,
                 metadata
             );
-            console.log("✓ Combined extraction complete");
-            console.log(`  - Themes: ${themes.keyThemes.length} identified`);
-            console.log(`  - Structured data: ${Object.keys(structuredData).length} fields extracted`);
-
-            // Step 1.5: Append pre-extracted structured metadata (bypass AI processing)
-            // These are already structured and accurate - no need for AI to re-extract
             this.appendPreExtractedMetadata(structuredData, metadata);
+            if (this.onProgress) this.onProgress(2, totalSteps);
 
-            // Step 2: Generate comprehensive summary
-            console.log("✍️  Step 2: Generating polished summary...");
             let summary = await this.generateSummary(content, themes, structuredData, template);
             summary = summary.trim();
-            console.log("✓ Summary generated");
-
-            console.log("✅ 2-step summarization complete!");
+            if (this.onProgress) this.onProgress(3, totalSteps);
 
             return {
                 summary: summary,

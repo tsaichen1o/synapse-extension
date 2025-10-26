@@ -22,6 +22,8 @@ function App(): React.JSX.Element {
     const [isInitializing, setIsInitializing] = useState<boolean>(false);
     const [initError, setInitError] = useState<string>("");
     const [loadingPhase, setLoadingPhase] = useState<LoadingPhase>(null);
+    const [condenseProgress, setCondenseProgress] = useState<{ current: number; total: number } | null>(null);
+    const [summarizeProgress, setSummarizeProgress] = useState<{ current: number; total: number } | null>(null);
     const [currentPageUrl, setCurrentPageUrl] = useState<string>("");
     const [currentPageContent, setCurrentPageContent] = useState<PageContent | null>(null);
     const [condensedContent, setCondensedContent] = useState<CondensedPageContent | null>(null);
@@ -162,6 +164,8 @@ function App(): React.JSX.Element {
         setStructuredData({});
         setChatMessages([]);
         setCondensedContent(null);
+        setCondenseProgress(null);
+        setSummarizeProgress(null);
 
         try {
             console.log("📄 Capturing page content...");
@@ -170,8 +174,16 @@ function App(): React.JSX.Element {
 
             setLoadingPhase("condensing");
             console.log("🔄 Condensing content...");
+
+            // Set up progress callback for condense operation
+            aiInstanceRef.current.setCondenseProgressCallback((current: number, total: number) => {
+                console.log(`Condense progress: ${current}/${total}`);
+                setCondenseProgress({ current, total });
+            });
+
             const condensed = await aiInstanceRef.current.condense(pageContent);
             setCondensedContent(condensed);
+            setCondenseProgress(null); // Clear progress after completion
 
             await aiInstanceRef.current.reset();
 
@@ -180,7 +192,15 @@ function App(): React.JSX.Element {
 
             setLoadingPhase("summarizing");
             console.log("📝 Generating summary from condensed content...");
+
+            // Set up progress callback for summarize operation
+            aiInstanceRef.current.setSummarizeProgressCallback((current: number, total: number) => {
+                console.log(`Summarize progress: ${current}/${total}`);
+                setSummarizeProgress({ current, total });
+            });
+
             const result = await aiInstanceRef.current.summarize(condensed);
+            setSummarizeProgress(null); // Clear progress after completion
 
             setInitialSummary(result.summary);
             setCurrentSummary(result.summary);
@@ -514,6 +534,8 @@ function App(): React.JSX.Element {
                 loadingPhase={loadingPhase}
                 hasInitialSummary={!!initialSummary}
                 onCapture={handleCapturePage}
+                condenseProgress={condenseProgress}
+                summarizeProgress={summarizeProgress}
             />
 
             <div className={`transition-all duration-500 ${hasUserInteracted ? 'flex flex-row gap-6' : 'flex flex-col'}`}>

@@ -33,7 +33,16 @@ import { CondensePrompts } from './prompts';
  * ```
  */
 export class CondenseService {
+    private onProgress?: (current: number, total: number) => void;
+
     constructor(protected ai: AI) { }
+
+    /**
+     * Set progress callback for real-time progress updates
+     */
+    setProgressCallback(callback: (current: number, total: number) => void): void {
+        this.onProgress = callback;
+    }
 
     private readonly CHUNK_SIZE = 6000;
     private readonly TARGET_CONDENSED_LENGTH = 8000;
@@ -200,18 +209,13 @@ export class CondenseService {
         contentType: string,
         metadata?: MetadataExtraction
     ): Promise<string> {
-        if (chunks.length === 0) {
-            return '';
-        }
-
-        // If content is already small enough, just do one pass of refinement
         const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
         if (totalLength <= this.TARGET_CONDENSED_LENGTH) {
             console.log("Content is already small enough, doing single refinement pass...");
-            return await this.refineContent(chunks.join('\n\n'), contentType);
+            return totalLength > 0 ? await this.refineContent(chunks.join('\n\n'), contentType) : '';
         }
 
-        // Extract paper context for research papers
+        const totalSteps = chunks.length + 2;
         const paperContext = contentType === 'research-paper' && metadata?.paperStructure
             ? {
                 title: metadata.description || '',
@@ -221,18 +225,13 @@ export class CondenseService {
             }
             : undefined;
 
-        console.log("🔄 Using incremental summarization strategy...");
-
-        // Step 1: Initialize the condensed summary structure
-        console.log("📋 Initializing condensed summary structure...");
         let condensedSummary = await this.initializeCondensedSummary(
             metadata?.description || '',
             contentType,
             metadata?.paperStructure
         );
-        console.log("✓ Initial structure created");
+        if (this.onProgress) this.onProgress(1, totalSteps);
 
-        // Step 2: Incrementally update the summary as we read each chunk
         for (let i = 0; i < chunks.length; i++) {
             console.log(`📖 Reading and integrating chunk ${i + 1}/${chunks.length} (${chunks[i].length} chars)...`);
 
@@ -244,14 +243,13 @@ export class CondenseService {
                 contentType,
                 paperContext
             );
+            if (this.onProgress) this.onProgress(i + 2, totalSteps);
 
             console.log(`✓ Summary updated (current length: ${condensedSummary.length} chars)`);
         }
 
-        // Step 3: Convert the final structured summary back to text
-        console.log("📝 Converting structured summary to narrative text...");
         const finalText = await this.convertSummaryToText(condensedSummary, contentType);
-        console.log(`✓ Final condensed text: ${finalText.length} chars`);
+        if (this.onProgress) this.onProgress(totalSteps, totalSteps);
 
         return finalText;
     }
