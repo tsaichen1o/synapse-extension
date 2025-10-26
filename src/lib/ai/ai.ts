@@ -194,27 +194,30 @@ export class AI {
     /**
      * Condense page content to avoid token limits
      * Delegates to CondenseService
+     * 
+     * This is the first required step in the AI processing pipeline.
+     * The output must be passed to summarize() and chat() methods.
      */
     async condense(pageContent: PageContent): Promise<CondensedPageContent> {
         return this.condenseService.condensePageContent(pageContent);
     }
 
     /**
-     * Summarize page content using AI
-     * Accepts either raw PageContent or pre-condensed CondensedPageContent
+     * Summarize condensed page content using AI
+     * Accepts only CondensedPageContent - you must call condense() first
      * Delegates to SummarizeService
      */
-    async summarize(input: PageContent | CondensedPageContent): Promise<SummaryResponse> {
+    async summarize(input: CondensedPageContent): Promise<SummaryResponse> {
         return this.summarizeService.summarize(input);
     }
 
     /**
      * Chat with AI to refine summaries and structured data
-     * Accepts either raw PageContent or pre-condensed CondensedPageContent
+     * Accepts only CondensedPageContent - you must call condense() first
      * Delegates to ChatService
      */
     async chat(
-        input: PageContent | CondensedPageContent,
+        input: CondensedPageContent,
         currentSummary: string,
         currentStructuredData: StructuredData,
         userMessage: string

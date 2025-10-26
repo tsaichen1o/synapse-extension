@@ -1,14 +1,21 @@
 import type { ContentExtraction } from '../schemas';
 import type { CondensedPageContent } from '../../../types';
+import type { ContentTemplate } from '../templates';
+import { generateFieldsPromptSection } from '../templates';
 
 /**
  * Prompt templates for SummarizeService
  */
 export class SummarizePrompts {
     /**
-     * Step 1: Extract key points and main themes from the content
+     * Combined extraction - get themes AND structured data in one AI call
      */
-    static extraction(content: string, title: string, metadata?: CondensedPageContent['metadata']): string {
+    static combinedExtraction(
+        content: string,
+        title: string,
+        template: ContentTemplate,
+        metadata?: CondensedPageContent['metadata']
+    ): string {
         const metadataInfo = metadata ? `
 ## Pre-extracted Metadata:
 Content Type: ${metadata.contentType}
@@ -24,129 +31,78 @@ ${metadata.paperStructure.keyFindings ? `Key Findings: ${metadata.paperStructure
 ` : ''}
 ` : '';
 
+        const fieldsSection = generateFieldsPromptSection(template);
+
         return `
-# Step 1: Content Extraction and Initial Analysis
+# Combined Content Analysis and Extraction
 
 ## Page Information:
 Title: ${title}
+Content Type: ${template.name}
 ${metadataInfo}
 
 ## Content:
 ${content}
 
 # Your Task
-Analyze this content and extract:
+Analyze this ${template.name.toLowerCase()} content and extract TWO things in one response:
+
+## Part 1: Theme Analysis
+Extract:
 1. Main topic and purpose
-2. Key themes and concepts (1-5 major themes, aim for 3-5 if possible)
-3. Important facts, data, or findings (list what you find, can be empty if none)
+2. Key themes and concepts (3-5 major themes)
+3. Important facts, data, or findings
 4. Target audience or intended use case
 
-${metadata?.contentType === 'research-paper' ? `
-**SPECIAL INSTRUCTIONS FOR RESEARCH PAPERS**:
-- Focus on identifying the paper's core contribution and novelty
-- Distinguish between background/related work vs. the paper's own contributions
-- Note the experimental setup, datasets, and evaluation metrics
-- Identify limitations and future work mentioned
-` : ''}
+${template.extractionHints ? `\n**Extraction Hints**: ${template.extractionHints}\n` : ''}
 
-Output a JSON object with:
-- mainTopic: brief description of the main topic
-- keyThemes: array of 1-5 key themes
-- importantFacts: array of important facts (empty array if none found)
-- targetAudience: description of target audience
-        `.trim();
-    }
+## Part 2: Structured Data
+Extract structured data according to this template:
 
-    /**
-     * Step 2: Identify and extract structured data based on initial analysis
-     */
-    static structuredData(content: string, title: string, extraction: ContentExtraction, metadata?: CondensedPageContent['metadata']): string {
-        // Special handling for research papers with pre-extracted authors
-        const authorHint = metadata?.authors && metadata.authors.length > 0
-            ? `\n## ⚠️ CRITICAL - AUTHORS ALREADY IDENTIFIED:\n${metadata.authors.join(', ')}\n**You MUST include these authors in the "authors" field.**\n`
-            : '';
+${fieldsSection}
 
-        return `
-# Step 2: Structured Data Extraction
+${metadata?.authors && metadata.authors.length > 0 ? `\n⚠️ **CRITICAL**: The authors are already identified as: ${metadata.authors.join(', ')}. You MUST include them in the "authors" field.\n` : ''}
 
-## Context from Previous Analysis:
-Main Topic: ${extraction.mainTopic}
-Key Themes: ${extraction.keyThemes.join(', ')}
-${authorHint}
-
-## Content:
-Title: ${title}
-${content}
-
-# Your Task
-Extract structured data from the content following the schema below.
-
-## CRITICAL RULES:
-1. **Output valid JSON only** - exactly matching the example format below
-2. **Include ALL fields** - use empty arrays [] for fields with no data
-3. **Be specific and concrete** - avoid vague or generic entries
-4. **For papers/articles**: ${metadata?.authors && metadata.authors.length > 0 ? '⚠️ USE THE PRE-IDENTIFIED AUTHORS ABOVE' : 'Authors are priority - check bylines, headers, document start/end'}
-
-## Required Output Format:
-
-Return a JSON object with exactly these fields (copy this structure):
+# Output Format
+Return a JSON object with exactly this structure:
 
 {
-  "authors": [],
-  "organizations": [],
-  "mentioned_people": [],
-  "locations": [],
-  "key_events": [],
-  "external_references": [],
-  "key_concepts": [],
-  "technologies_tools": [],
-  "methodologies": [],
-  "code_elements": [],
-  "problems_discussed": [],
-  "solutions_proposed": [],
-  "comparisons": [],
-  "datasets_mentioned": [],
-  "data_sources": [],
-  "mentioned_media": []
+  "themes": {
+    "mainTopic": "brief description of the main topic",
+    "keyThemes": ["theme1", "theme2", "theme3"],
+    "importantFacts": ["fact1", "fact2"],
+    "targetAudience": "description of target audience"
+  },
+  "structuredData": {
+    // All template fields here - use empty arrays [] for fields with no data
+    // Include ALL fields defined in the template above
+  }
 }
 
-## Field Descriptions:
-- **authors**: Author names or primary contributors ${metadata?.authors && metadata.authors.length > 0 ? '(USE PRE-IDENTIFIED AUTHORS)' : ''}
-- **organizations**: Companies, institutions mentioned
-- **mentioned_people**: People mentioned (excluding authors)
-- **locations**: Geographical locations
-- **key_events**: Named events (e.g., "Google I/O 2025")
-- **external_references**: External sources, DOIs, papers cited
-- **key_concepts**: Core topics (e.g., "Machine Learning")
-- **technologies_tools**: Software, frameworks (e.g., "React", "TensorFlow")
-- **methodologies**: Algorithms, methods (e.g., "K-means Clustering")
-- **code_elements**: Function names, APIs (e.g., "useState()")
-- **problems_discussed**: Specific challenges addressed
-- **solutions_proposed**: Specific solutions or recommendations
-- **comparisons**: A vs B comparisons (e.g., "Python vs Java")
-- **datasets_mentioned**: Named datasets (e.g., "ImageNet")
-- **data_sources**: Data providers (e.g., "Kaggle")
-- **mentioned_media**: Books, papers, podcasts referenced
-
-## Extraction Guidelines:
-- **Include ALL 16 fields** in your response (use [] for empty)
-- ${metadata?.authors && metadata.authors.length > 0 ? '**USE PRE-IDENTIFIED AUTHORS** from the metadata above' : '**Prioritize authors** for papers/articles'}
-- **Be specific**: "React" ✓ | "frontend frameworks" ✗
-- **Only include items explicitly mentioned** in the content
-- **Use exact names**: Preserve capitalization
+**IMPORTANT**:
+- Include ALL template fields in structuredData (use [] or "" for empty fields)
+- Be specific and concrete - avoid vague entries
+- Extract exact names and preserve capitalization
+- Only include information explicitly mentioned in the content
         `.trim();
     }
 
     /**
-     * Step 3: Generate a polished summary incorporating all previous analysis
+     * Generate summary using template guidelines
      */
-    static summary(content: string, extraction: ContentExtraction, structuredData: any): string {
+    static summaryWithTemplate(
+        content: string,
+        themes: ContentExtraction,
+        structuredData: Record<string, any>,
+        template: ContentTemplate
+    ): string {
         return `
-# Step 3: Final Summary Generation
+# Summary Generation
 
-## Context from Previous Steps:
-Main Topic: ${extraction.mainTopic}
-Key Themes: ${extraction.keyThemes.join(', ')}
+## Context from Analysis:
+Main Topic: ${themes.mainTopic}
+Key Themes: ${themes.keyThemes.join(', ')}
+Target Audience: ${themes.targetAudience}
 
 ## Structured Data Extracted:
 ${JSON.stringify(structuredData, null, 2)}
@@ -155,30 +111,19 @@ ${JSON.stringify(structuredData, null, 2)}
 ${content}
 
 # Your Task
-Write a concise, informative summary (150-300 words) that:
-1. Clearly states the main topic and purpose
-2. Highlights key themes and important findings
-3. Is coherent and flows naturally
-4. Uses professional yet accessible language
-5. Captures the essence without unnecessary details
+Write a concise, informative summary (150-300 words) for this ${template.name.toLowerCase()}.
 
-Return ONLY the summary text (no JSON, no markdown, just the summary paragraph).
-        `.trim();
-    }
+## Guidelines for ${template.name}:
+${template.summaryGuidelines}
 
-    /**
-     * Fallback: Simple single-step summarization
-     */
-    static fallback(content: string, title: string): string {
-        return `
-Analyze this content and provide a summary (150-300 words) and key structured information.
+## Writing Style:
+- Clear and professional
+- Flows naturally with good transitions
+- Captures the essence without unnecessary details
+- Uses accessible language
+- Highlights the most important information
 
-Title: ${title}
-Content: ${content}
-
-Output a JSON object with:
-- summary: your summary here (150-300 words)
-- structuredData: object with relevant key-value pairs
+Return ONLY the summary text (no JSON, no markdown headers, just the summary paragraph).
         `.trim();
     }
 }

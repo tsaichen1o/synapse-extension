@@ -1,15 +1,15 @@
 import type { IntentAnalysis, Modification } from '../schemas';
-import type { PageContent, CondensedPageContent, StructuredData } from '../../../types';
+import type { StructuredData } from '../../../types';
 
 /**
  * Prompt templates for ChatService
+ * All methods accept simple string/object parameters, not complex types
  */
 export class ChatPrompts {
     /**
      * Step 1: Understand user intent and what needs to be modified
      */
     static intentAnalysis(
-        input: PageContent | CondensedPageContent,
         currentSummary: string,
         currentStructuredData: StructuredData,
         userMessage: string
@@ -43,14 +43,14 @@ Output a JSON object with:
      * Step 2: Execute modifications based on intent analysis
      */
     static modification(
-        content: string,
+        condensedContent: string,
         currentSummary: string,
         currentStructuredData: StructuredData,
         userMessage: string,
         intent: IntentAnalysis
     ): string {
         const relevantContent = intent.needsOriginalContent
-            ? `\n## Original Content Reference:\n${content}`
+            ? `\n## Condensed Content Reference:\n${condensedContent}`
             : '';
 
         return `
@@ -133,45 +133,71 @@ Output a JSON object with:
     static directQuestion(
         currentSummary: string,
         currentStructuredData: StructuredData,
-        content: string,
+        condensedContent: string,
         userMessage: string
     ): string {
         return `
 Context: ${currentSummary}
 Structured Data: ${JSON.stringify(currentStructuredData)}
-Original Content: ${content}
+Condensed Content: ${condensedContent}
 
 User Question: "${userMessage}"
 
-Provide a helpful, accurate answer based on the context and original content.
+Provide a helpful, accurate answer based on the context and condensed content.
         `.trim();
     }
 
     /**
-     * Fallback: Simple single-step chat
+     * Simple modification (streamlined, no intent analysis)
      */
-    static fallback(
-        content: string,
-        title: string,
+    static simpleModification(
+        condensedContent: string,
         currentSummary: string,
         currentStructuredData: StructuredData,
         userMessage: string
     ): string {
         return `
-You are helping refine a web page summary and structured data.
+# Execute Simple Modification
 
-Current Summary: ${currentSummary}
-Current Structured Data: ${JSON.stringify(currentStructuredData, null, 2)}
-Original Content: ${title} - ${content}
+## Current Summary:
+${currentSummary}
 
-User Request: "${userMessage}"
+## Current Structured Data:
+${JSON.stringify(currentStructuredData, null, 2)}
 
-Update the summary and structured data according to the user's request, or answer their question.
+## Condensed Content Reference:
+${condensedContent}
+
+## User Request:
+"${userMessage}"
+
+# Your Task
+Make the requested changes to the summary and/or structured data.
+Be precise and only change what the user asked for.
 
 Output a JSON object with:
-- summary: updated or unchanged summary
-- structuredData: object with updated or unchanged data
-- aiResponse: your conversational response to the user
+- modifiedSummary: the updated summary (or unchanged if not modified)
+- modifiedStructuredData: object with updated structured data (or unchanged if not modified)
+- changeDescription: brief description of what was changed (e.g., "Shortened summary", "Added author information")
+        `.trim();
+    }
+
+    /**
+     * Simple response generation (for simple modifications)
+     */
+    static simpleResponse(
+        userMessage: string,
+        modifications: Modification
+    ): string {
+        return `
+User requested: "${userMessage}"
+
+Changes made: ${modifications.changeDescription}
+
+Generate a brief, friendly response (1-2 sentences) acknowledging what was done.
+Example: "I've shortened the summary as requested." or "Added the author information you mentioned."
+
+Return ONLY the response text.
         `.trim();
     }
 }
