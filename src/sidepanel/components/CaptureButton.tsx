@@ -1,6 +1,5 @@
-import React, { useState, useEffect } from "react";
-
-type LoadingPhase = "capturing" | "condensing" | "summarizing" | "chatting" | "saving" | null;
+import React, { useState, useEffect }from "react";
+import { LoadingPhase } from "../types";
 
 interface CaptureButtonProps {
     loadingPhase: LoadingPhase;

@@ -1,11 +1,5 @@
 import React from "react";
-
-interface ChatMessage {
-    sender: "user" | "ai";
-    text: string;
-}
-
-type LoadingPhase = "capturing" | "condensing" | "summarizing" | "chatting" | "saving" | null;
+import { ChatMessage, LoadingPhase } from "../types";
 
 interface ChatPanelProps {
     messages: ChatMessage[];

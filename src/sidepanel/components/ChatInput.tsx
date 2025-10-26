@@ -1,6 +1,5 @@
 import React from "react";
-
-type LoadingPhase = "capturing" | "condensing" | "summarizing" | "chatting" | "saving" | null;
+import { LoadingPhase } from "../types";
 
 interface ChatInputProps {
     chatInput: string;
