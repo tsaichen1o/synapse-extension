@@ -1,4 +1,4 @@
-import type { PageContent } from '../../types';
+import type { PageContent } from '../../../types';
 
 /**
  * Prompt templates for CondenseService
@@ -202,27 +202,6 @@ ${contentType === 'research-paper' ? `
 - Write as continuous text, NOT as bullet points
 
 Return ONLY the narrative text.
-        `.trim();
-    }
-
-    /**
-     * Final condensing pass to ensure content fits target length
-     */
-    static finalCondense(content: string, contentType: string, targetLength: number): string {
-        return `
-Condense this ${contentType} content to approximately ${targetLength} characters.
-
-Current content (${content.length} chars):
-${content}
-
-Instructions:
-- Preserve all critical information and key facts
-- Remove any remaining redundancy
-- Keep the most important details and findings
-- Maintain coherent structure
-- Be concise but complete
-
-Return ONLY the condensed text.
         `.trim();
     }
 

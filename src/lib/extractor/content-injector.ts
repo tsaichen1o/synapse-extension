@@ -10,7 +10,7 @@
  * The last expression is returned as the script result to chrome.scripting.executeScript
  */
 
-import { extractPageContentWithReadability, extractPageContentFromDOM, extractArxivPaper } from '../extractor';
+import { extractPageContentWithReadability, extractPageContentFromDOM, extractArxivPaper } from '.';
 
 (function () {
     // Try arXiv extractor first

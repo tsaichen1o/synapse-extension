@@ -11,7 +11,7 @@ export default defineConfig({
 				background: resolve(__dirname, "src/background/background.ts"),
 				// Added: Knowledge graph page HTML entry
 				graph: resolve(__dirname, "graph.html"),
-				'content-injector': resolve(__dirname, 'src/lib/injector/content-injector.ts'),
+				'content-injector': resolve(__dirname, 'src/lib/extractor/content-injector.ts'),
 			},
 			output: {
 				entryFileNames: (chunkInfo) => {

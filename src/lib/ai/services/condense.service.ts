@@ -2,7 +2,7 @@ import type { AI } from '../ai';
 import type { PageContent, CondensedPageContent } from '../../types';
 import { metadataExtractionSchema } from './schemas';
 import type { MetadataExtraction } from './schemas';
-import { CondensePrompts } from '../prompts';
+import { CondensePrompts } from './prompts';
 
 
 /**
@@ -73,25 +73,46 @@ export class CondenseService {
             const condensedContent = await this.processChunksIteratively(chunks, metadata.contentType, metadata);
             console.log(`✓ Content condensed to ${condensedContent.length} chars`);
 
+            // Step 4: Select top references for research papers
+            let topReferences: any[] | undefined;
+            let totalReferences: number | undefined;
+
+            if (pageContent.metadata.contentType === 'research-paper' && pageContent.metadata.references) {
+                console.log("📚 Step 4: Selecting top references...");
+                const allReferences = pageContent.metadata.references;
+                totalReferences = allReferences.length;
+
+                // For now, simply take the first 15 references
+                // TODO: In the future, we could rank by citation frequency in the text
+                topReferences = allReferences.slice(0, 15);
+                console.log(`✓ Selected ${topReferences.length} out of ${totalReferences} references`);
+            }
+
             const compressionRatio = condensedContent.length / originalLength;
 
             const result: CondensedPageContent = {
                 title: pageContent.title || 'Untitled',
                 url: pageContent.url || '',
                 condensedContent,
-                metadata,
+                metadata: {
+                    ...metadata,
+                    topReferences,
+                    totalReferences,
+                },
                 originalLength,
                 condensedLength: condensedContent.length,
                 compressionRatio,
             };
 
             console.log(`✅ Condensing complete! Compression ratio: ${(compressionRatio * 100).toFixed(1)}%`);
+            if (topReferences) {
+                console.log(`📚 Included ${topReferences.length} top references in metadata`);
+            }
             return result;
 
         } catch (error) {
             console.error("❌ Error in condensePageContent:", error);
-            // Fallback: return original content with minimal processing
-            return this.createFallbackCondensedContent(pageContent, rawContent);
+            throw error;
         }
     }
 
@@ -353,33 +374,6 @@ export class CondenseService {
     }
 
     /**
-     * Create fallback condensed content when processing fails
-     */
-    private createFallbackCondensedContent(
-        pageContent: PageContent,
-        rawContent: string
-    ): CondensedPageContent {
-        console.log("⚠️  Creating fallback condensed content");
-
-        const truncated = this.truncateContent(rawContent, this.TARGET_CONDENSED_LENGTH);
-
-        return {
-            title: pageContent.title || 'Untitled',
-            url: pageContent.url || '',
-            condensedContent: truncated,
-            metadata: {
-                description: pageContent.metadata.description || pageContent.abstract || 'No description available',
-                mainTopics: pageContent.metadata.tags || [],
-                keyEntities: [],
-                contentType: pageContent.metadata.contentType || 'generic',
-            },
-            originalLength: rawContent.length,
-            condensedLength: truncated.length,
-            compressionRatio: truncated.length / rawContent.length,
-        };
-    }
-
-    /**
      * Split content into paragraphs
      */
     private splitIntoParagraphs(content: string): string[] {
@@ -389,25 +383,5 @@ export class CondenseService {
             .filter(p => p.length > 0);
 
         return paragraphs;
-    }
-
-    /**
-     * Truncate content to a maximum length while preserving meaningful text
-     */
-    private truncateContent(content: string, maxLength: number): string {
-        if (content.length <= maxLength) {
-            return content;
-        }
-
-        const truncated = content.substring(0, maxLength);
-        const lastPeriod = truncated.lastIndexOf('.');
-        const lastNewline = truncated.lastIndexOf('\n');
-        const cutPoint = Math.max(lastPeriod, lastNewline);
-
-        if (cutPoint > maxLength * 0.8) {
-            return truncated.substring(0, cutPoint + 1) + '\n\n[Content truncated...]';
-        }
-
-        return truncated + '\n\n[Content truncated...]';
     }
 }

@@ -11,22 +11,20 @@ import type {
 import { SummarizeService, ChatService, CondenseService, ImageService } from './services';
 
 /**
- * GeminiAI - A wrapper class for Chrome Built-in AI (Gemini Nano)
- * Provides convenient methods for interacting with the on-device AI model
+ * Wrapper class for Chrome Built-in AI (currently Gemini Nano)
  */
 export class AI {
     private nativeSession: AILanguageModelSession;
 
-    // Services for different AI functionalities
-    public readonly summarizeService: SummarizeService;
-    public readonly chatService: ChatService;
-    public readonly condenseService: CondenseService;
-    public readonly imageService: ImageService;
+    private readonly summarizeService: SummarizeService;
+    private readonly chatService: ChatService;
+    private readonly condenseService: CondenseService;
+    private readonly imageService: ImageService;
+
 
     private constructor(session: AILanguageModelSession) {
         this.nativeSession = session;
 
-        // Initialize services
         this.summarizeService = new SummarizeService(this);
         this.chatService = new ChatService(this);
         this.condenseService = new CondenseService(this);
@@ -135,7 +133,8 @@ export class AI {
     }
 
     /**
-     * Get current resource usage information
+     * Get current resource usage information.
+     * TODO: Show usage in the UI for information.
      */
     getUsage(): {
         usage: number;
@@ -147,13 +146,6 @@ export class AI {
         const percentUsed = quota > 0 ? (usage / quota) * 100 : 0;
 
         return { usage, quota, percentUsed };
-    }
-
-    /**
-     * Check if resource usage is above a threshold
-     */
-    isUsageHigh(threshold: number = 80): boolean {
-        return this.getUsage().percentUsed >= threshold;
     }
 
     /**
@@ -202,27 +194,30 @@ export class AI {
     /**
      * Condense page content to avoid token limits
      * Delegates to CondenseService
+     * 
+     * This is the first required step in the AI processing pipeline.
+     * The output must be passed to summarize() and chat() methods.
      */
     async condense(pageContent: PageContent): Promise<CondensedPageContent> {
         return this.condenseService.condensePageContent(pageContent);
     }
 
     /**
-     * Summarize page content using AI
-     * Accepts either raw PageContent or pre-condensed CondensedPageContent
+     * Summarize condensed page content using AI
+     * Accepts only CondensedPageContent - you must call condense() first
      * Delegates to SummarizeService
      */
-    async summarize(input: PageContent | CondensedPageContent): Promise<SummaryResponse> {
+    async summarize(input: CondensedPageContent): Promise<SummaryResponse> {
         return this.summarizeService.summarize(input);
     }
 
     /**
      * Chat with AI to refine summaries and structured data
-     * Accepts either raw PageContent or pre-condensed CondensedPageContent
+     * Accepts only CondensedPageContent - you must call condense() first
      * Delegates to ChatService
      */
     async chat(
-        input: PageContent | CondensedPageContent,
+        input: CondensedPageContent,
         currentSummary: string,
         currentStructuredData: StructuredData,
         userMessage: string
