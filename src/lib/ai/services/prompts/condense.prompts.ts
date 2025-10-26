@@ -206,27 +206,6 @@ Return ONLY the narrative text.
     }
 
     /**
-     * Final condensing pass to ensure content fits target length
-     */
-    static finalCondense(content: string, contentType: string, targetLength: number): string {
-        return `
-Condense this ${contentType} content to approximately ${targetLength} characters.
-
-Current content (${content.length} chars):
-${content}
-
-Instructions:
-- Preserve all critical information and key facts
-- Remove any remaining redundancy
-- Keep the most important details and findings
-- Maintain coherent structure
-- Be concise but complete
-
-Return ONLY the condensed text.
-        `.trim();
-    }
-
-    /**
      * Refine content that's already within target length
      */
     static refine(content: string, contentType: string): string {

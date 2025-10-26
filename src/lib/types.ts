@@ -47,6 +47,44 @@ export interface PaperStructure {
 }
 
 /**
+ * Reference/Citation structure for academic papers
+ */
+export interface Reference {
+    /** Unique ID (e.g., "bib.bib46") */
+    id: string;
+    /** Citation key/label (e.g., "Zhao et al. (2024)") */
+    label: string;
+    /** Raw citation text */
+    citationText: string;
+    /** Parsed author names (if possible) */
+    authors?: string[];
+    /** Paper title (if identifiable) */
+    title?: string;
+    /** Venue/Journal name (if identifiable) */
+    venue?: string;
+    /** Publication year (if identifiable) */
+    year?: string;
+    /** DOI (if available) */
+    doi?: string;
+    /** URL (if available) */
+    url?: string;
+}
+
+/**
+ * Figure/Table metadata
+ */
+export interface Figure {
+    /** Figure ID (e.g., "S1.F1") */
+    id: string;
+    /** Figure caption */
+    caption: string;
+    /** Image source URL (if available) */
+    imageUrl?: string;
+    /** Figure number (e.g., "1", "2.1") */
+    number?: string;
+}
+
+/**
  * Condensed content structure that's optimized for AI processing
  * This structure significantly reduces token usage while preserving all essential information
  */
@@ -63,6 +101,10 @@ export interface CondensedPageContent {
         authors?: string[];
         contentType: ContentType;
         paperStructure?: PaperStructure;
+        /** Top/most-cited references (for research papers) */
+        topReferences?: Reference[];
+        /** Total reference count */
+        totalReferences?: number;
     };
     // Original length info for reference
     originalLength: number;
@@ -108,6 +150,14 @@ export interface PageContent {
         sections?: ContentSection[];
         /** Research paper specific structure */
         paperStructure?: PaperStructure;
+        /** References/Bibliography (for academic papers) */
+        references?: Reference[];
+        /** Figures and tables (for academic papers and technical docs) */
+        figures?: Figure[];
+        /** ArXiv version (e.g., "v1", "v2") */
+        arxivVersion?: string;
+        /** Subject categories (e.g., ["cs.AI", "cs.LG"]) */
+        subjects?: string[];
         /** Extractor-specific extra data (AI Services should not depend on this) */
         extra?: Record<string, any>;
     };

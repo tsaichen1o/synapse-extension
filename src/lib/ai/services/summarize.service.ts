@@ -4,7 +4,7 @@ import { normalizeStructuredData } from './utils';
 import { extractionSchema } from './schemas';
 import type { ContentExtraction } from './schemas';
 import { SummarizePrompts } from './prompts';
-import { getTemplate, generateSchemaFromTemplate } from './templates';
+import { getTemplate, generateSchemaFromTemplate, ContentTemplate } from './templates';
 import { AIErrors } from '../../errors';
 
 /**
@@ -51,6 +51,10 @@ export class SummarizeService {
             console.log(`  - Themes: ${themes.keyThemes.length} identified`);
             console.log(`  - Structured data: ${Object.keys(structuredData).length} fields extracted`);
 
+            // Step 1.5: Append pre-extracted structured metadata (bypass AI processing)
+            // These are already structured and accurate - no need for AI to re-extract
+            this.appendPreExtractedMetadata(structuredData, metadata);
+
             // Step 2: Generate comprehensive summary
             console.log("✍️  Step 2: Generating polished summary...");
             let summary = await this.generateSummary(content, themes, structuredData, template);
@@ -71,12 +75,44 @@ export class SummarizeService {
     }
 
     /**
+     * Append pre-extracted structured metadata directly to structured data
+     * These are already accurate and structured - no need for AI to re-process
+     */
+    private appendPreExtractedMetadata(
+        structuredData: Record<string, any>,
+        metadata: CondensedPageContent['metadata']
+    ): void {
+        // For research papers, add references and academic metadata
+        if (metadata.contentType === 'research-paper') {
+            // Add top references (論文標題列表)
+            if (metadata.topReferences && metadata.topReferences.length > 0) {
+                console.log("📚 Appending pre-extracted references...");
+                structuredData.key_references = metadata.topReferences.slice(0, 5).map(ref => {
+                    return ref.title ||
+                        ref.label ||
+                        `${ref.authors?.join(', ') || 'Unknown'} (${ref.year || 'n.d.'})`;
+                });
+                console.log(`  ✓ Added ${structuredData.key_references.length} key references`);
+            }
+
+            // Add total reference count
+            if (metadata.totalReferences) {
+                structuredData.total_references = metadata.totalReferences;
+                console.log(`  ✓ Total references: ${metadata.totalReferences}`);
+            }
+        }
+
+        // Add other pre-extracted metadata if available
+        // 未來可以擴展：figures, tables, equations, etc.
+    }
+
+    /**
      * Combined extraction step - gets both themes and structured data in one AI call
      */
     private async extractCombined(
         content: string,
         title: string,
-        template: ReturnType<typeof getTemplate>,
+        template: ContentTemplate,
         metadata?: CondensedPageContent['metadata']
     ): Promise<{
         themes: ContentExtraction;
@@ -112,7 +148,7 @@ export class SummarizeService {
         content: string,
         themes: ContentExtraction,
         structuredData: Record<string, any>,
-        template: ReturnType<typeof getTemplate>
+        template: ContentTemplate
     ): Promise<string> {
         try {
             const prompt = SummarizePrompts.summaryWithTemplate(content, themes, structuredData, template);
