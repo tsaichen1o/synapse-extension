@@ -92,9 +92,6 @@ export class SummarizeService {
                 console.log(`  ✓ Total references: ${metadata.totalReferences}`);
             }
         }
-
-        // Add other pre-extracted metadata if available
-        // 未來可以擴展：figures, tables, equations, etc.
     }
 
     /**

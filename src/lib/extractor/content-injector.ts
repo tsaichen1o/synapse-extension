@@ -15,7 +15,8 @@ import {
     extractPageContentWithReadability,
     extractPageContentFromDOM,
     extractArxivPaper,
-    extractArxivAbstract
+    extractArxivAbstract,
+    extractAmazonProduct,
 } from '.';
 
 (function () {
@@ -31,6 +32,13 @@ import {
     if (arxivContent) {
         console.log("📚 arXiv HTML paper detected - using specialized extractor");
         return arxivContent;
+    }
+
+    // Try Amazon product extractor
+    const amazonContent = extractAmazonProduct(document);
+    if (amazonContent) {
+        console.log("🛒 Amazon product page detected - using specialized extractor");
+        return amazonContent;
     }
 
     // Try Readability extractor
