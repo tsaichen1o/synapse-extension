@@ -1,17 +1,31 @@
-import React, { useState, useEffect }from "react";
+import React, { useState, useEffect } from "react";
 import { LoadingPhase } from "../types";
 
 interface CaptureButtonProps {
     loadingPhase: LoadingPhase;
     hasInitialSummary: boolean;
     onCapture: () => void;
+    condenseProgress?: { current: number; total: number } | null;
+    summarizeProgress?: { current: number; total: number } | null;
 }
 
-export function CaptureButton({ loadingPhase, hasInitialSummary, onCapture }: CaptureButtonProps): React.JSX.Element {
+export function CaptureButton({ loadingPhase, hasInitialSummary, onCapture, condenseProgress, summarizeProgress }: CaptureButtonProps): React.JSX.Element {
     const [progress, setProgress] = useState(0);
     const [prevPhase, setPrevPhase] = useState<LoadingPhase>(null);
 
     useEffect(() => {
+        if (condenseProgress && loadingPhase === "condensing") {
+            const realProgress = (condenseProgress.current / condenseProgress.total) * 100;
+            setProgress(realProgress);
+            return;
+        }
+
+        if (summarizeProgress && loadingPhase === "summarizing") {
+            const realProgress = (summarizeProgress.current / summarizeProgress.total) * 100;
+            setProgress(realProgress);
+            return;
+        }
+
         // If phase changed from condensing/summarizing to something else, complete the progress
         if ((prevPhase === "condensing" || prevPhase === "summarizing") &&
             loadingPhase !== prevPhase &&
@@ -23,50 +37,11 @@ export function CaptureButton({ loadingPhase, hasInitialSummary, onCapture }: Ca
 
         setPrevPhase(loadingPhase);
 
-        if (loadingPhase === "condensing" || loadingPhase === "summarizing") {
-            setProgress(0);
-            const interval = setInterval(() => {
-                setProgress((prev) => {
-                    // More realistic progress simulation with variable speed and randomness
-                    if (prev >= 92) return prev; // Cap at 92% to leave room for final jump
-
-                    // Different speed curves for different progress ranges
-                    let baseIncrement: number;
-                    let randomVariation: number;
-
-                    if (prev < 20) {
-                        // Fast start (5-12%)
-                        baseIncrement = 7;
-                        randomVariation = Math.random() * 5;
-                    } else if (prev < 50) {
-                        // Medium speed (3-8%)
-                        baseIncrement = 4;
-                        randomVariation = Math.random() * 4;
-                    } else if (prev < 70) {
-                        // Slowing down (2-5%)
-                        baseIncrement = 2;
-                        randomVariation = Math.random() * 3;
-                    } else if (prev < 85) {
-                        // Much slower (0.5-2%)
-                        baseIncrement = 0.5;
-                        randomVariation = Math.random() * 1.5;
-                    } else {
-                        // Very slow crawl to 92% (0.1-0.5%)
-                        baseIncrement = 0.1;
-                        randomVariation = Math.random() * 0.4;
-                    }
-
-                    const increment = baseIncrement + randomVariation;
-                    const newProgress = Math.min(prev + increment, 92);
-                    return Math.round(newProgress * 10) / 10; // Round to 1 decimal place
-                });
-            }, 400); // Slightly slower interval for smoother animation
-
-            return () => clearInterval(interval);
-        } else if (loadingPhase === null || loadingPhase === "capturing") {
+        // Fallback: If no real progress data available, reset
+        if (loadingPhase === null || loadingPhase === "capturing") {
             setProgress(0);
         }
-    }, [loadingPhase, prevPhase]);
+    }, [loadingPhase, prevPhase, condenseProgress, summarizeProgress]);
 
     const buttonBaseClasses = "group w-full font-semibold py-4 px-6 rounded-2xl transition-all duration-300 shadow-lg flex items-center justify-center gap-3 transform";
 
@@ -102,7 +77,12 @@ export function CaptureButton({ loadingPhase, hasInitialSummary, onCapture }: Ca
                                 <svg className="animate-pulse h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                                 </svg>
-                                <span>Condensing content...</span>
+                                <span>
+                                    {condenseProgress
+                                        ? `Processing chunk ${condenseProgress.current}/${condenseProgress.total}...`
+                                        : 'Condensing content...'
+                                    }
+                                </span>
                             </div>
                             <div className="w-full max-w-xs h-2 bg-purple-100/50 rounded-full overflow-hidden">
                                 <div
@@ -122,7 +102,12 @@ export function CaptureButton({ loadingPhase, hasInitialSummary, onCapture }: Ca
                                 <svg className="animate-pulse h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                                 </svg>
-                                <span>AI analyzing...</span>
+                                <span>
+                                    {summarizeProgress
+                                        ? `AI analyzing step ${summarizeProgress.current}/${summarizeProgress.total}...`
+                                        : 'AI analyzing...'
+                                    }
+                                </span>
                             </div>
                             <div className="w-full max-w-xs h-2 bg-purple-100/50 rounded-full overflow-hidden">
                                 <div

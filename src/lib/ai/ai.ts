@@ -192,6 +192,22 @@ export class AI {
     }
 
     /**
+     * Set progress callback for condense operation
+     * This allows UI to show real-time progress during chunk processing
+     */
+    setCondenseProgressCallback(callback: (current: number, total: number) => void): void {
+        this.condenseService.setProgressCallback(callback);
+    }
+
+    /**
+     * Set progress callback for summarize operation
+     * This allows UI to show real-time progress during summarization steps
+     */
+    setSummarizeProgressCallback(callback: (current: number, total: number) => void): void {
+        this.summarizeService.setProgressCallback(callback);
+    }
+
+    /**
      * Condense page content to avoid token limits
      * Delegates to CondenseService
      * 
