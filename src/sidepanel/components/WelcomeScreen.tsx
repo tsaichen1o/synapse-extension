@@ -36,9 +36,9 @@ export function WelcomeScreen({ isInitializing, initError, onInitialize }: Welco
                             <p className="text-sm text-gray-600 leading-relaxed mb-4">
                                 To get started, we need to initialize the AI model. This may download the model if it's not already available on your device.
                             </p>
-                            <div className="bg-purple-50/50 rounded-xl p-3 border border-purple-100">
+                            <div className="bg-purple-50/50 rounded-xl -ml-2 p-3 border border-purple-100">
                                 <p className="text-xs text-purple-700 font-medium">
-                                    🔒 This requires your permission to download resources. Click the button below to proceed.
+                                    📢 This requires your permission to download resources. Click the button below to proceed.
                                 </p>
                             </div>
                         </div>
