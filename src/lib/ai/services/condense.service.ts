@@ -84,18 +84,17 @@ export class CondenseService {
             console.log("🔄 Step 3: Processing chunks iteratively...");
             const condensedContent = await this.processChunksIteratively(
                 chunks,
-                contentType,
-                pageContent.metadata.paperStructure
+                contentType
             );
             console.log(`✓ Content condensed to ${condensedContent.length} chars`);
 
             const compressionRatio = condensedContent.length / originalLength;
 
             const result: CondensedPageContent = {
-                title: pageContent.title || 'Untitled',
+                title: pageContent.title || '',
                 url: pageContent.url || '',
                 condensedContent,
-                metadata: pageContent.metadata, // Direct copy, no transformation
+                metadata: pageContent.metadata,
                 originalLength,
                 condensedLength: condensedContent.length,
                 compressionRatio,
@@ -146,29 +145,22 @@ export class CondenseService {
      */
     private async processChunksIteratively(
         chunks: string[],
-        contentType: string,
-        paperStructure?: PageContent['metadata']['paperStructure']
+        contentType: string
     ): Promise<string> {
         const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
         if (totalLength <= this.TARGET_CONDENSED_LENGTH) {
             console.log("Content is already small enough, doing single refinement pass...");
-            return totalLength > 0 ? await this.refineContent(chunks.join('\n\n'), contentType) : '';
+            if (this.onProgress) this.onProgress(1, 2);
+            const ret = totalLength > 0 ? await this.refineContent(chunks.join('\n\n'), contentType) : '';
+            if (this.onProgress) this.onProgress(2, 2);
+            return ret;
         }
 
         const totalSteps = chunks.length + 2;
-        const paperContext = contentType === 'research-paper' && paperStructure
-            ? {
-                title: '', // Will be filled in initializeCondensedSummary
-                mainContribution: paperStructure.mainContribution,
-                researchQuestion: paperStructure.researchQuestion,
-                methodology: paperStructure.methodology
-            }
-            : undefined;
 
         let condensedSummary = await this.initializeCondensedSummary(
             '', // Description not needed anymore
-            contentType,
-            paperStructure
+            contentType
         );
         if (this.onProgress) this.onProgress(1, totalSteps);
 
@@ -180,8 +172,7 @@ export class CondenseService {
                 chunks[i],
                 i,
                 chunks.length,
-                contentType,
-                paperContext
+                contentType
             );
             if (this.onProgress) this.onProgress(i + 2, totalSteps);
 
@@ -197,24 +188,13 @@ export class CondenseService {
     /**
      * Initialize condensed summary structure for incremental building
      */
-    /**
-     * Initialize condensed summary structure for incremental building
-     */
     private async initializeCondensedSummary(
         description: string,
-        contentType: string,
-        paperStructure?: PageContent['metadata']['paperStructure']
+        contentType: string
     ): Promise<string> {
-        const paperContext = paperStructure ? {
-            researchQuestion: paperStructure.researchQuestion,
-            mainContribution: paperStructure.mainContribution,
-            methodology: paperStructure.methodology
-        } : undefined;
-
         const prompt = CondensePrompts.initializeCondensedSummary(
             description,
-            contentType,
-            paperContext
+            contentType
         );
 
         try {
@@ -227,8 +207,8 @@ export class CondenseService {
                 return JSON.stringify({
                     background: "",
                     problem: "",
-                    contribution: paperContext?.mainContribution || "",
-                    methodology: paperContext?.methodology || "",
+                    contribution: "",
+                    methodology: "",
                     results: "",
                     conclusion: "",
                     technical_details: ""
@@ -251,21 +231,14 @@ export class CondenseService {
         newChunk: string,
         chunkIndex: number,
         totalChunks: number,
-        contentType: string,
-        paperContext?: {
-            title: string;
-            mainContribution?: string;
-            researchQuestion?: string;
-            methodology?: string;
-        }
+        contentType: string
     ): Promise<string> {
         const prompt = CondensePrompts.updateCondensedSummary(
             currentSummary,
             newChunk,
             chunkIndex,
             totalChunks,
-            contentType,
-            paperContext
+            contentType
         );
 
         try {

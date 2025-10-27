@@ -7,25 +7,12 @@ export class CondensePrompts {
      */
     static initializeCondensedSummary(
         title: string,
-        contentType: string,
-        paperContext?: {
-            researchQuestion?: string;
-            mainContribution?: string;
-            methodology?: string;
-        }
+        contentType: string
     ): string {
-        const paperInfo = paperContext ? `
-## Paper Context:
-${paperContext.researchQuestion ? `Research Question: ${paperContext.researchQuestion}` : ''}
-${paperContext.mainContribution ? `Main Contribution: ${paperContext.mainContribution}` : ''}
-${paperContext.methodology ? `Methodology: ${paperContext.methodology}` : ''}
-` : '';
-
         return `
 Initialize a condensed summary structure for a ${contentType}.
 
 Title: ${title}
-${paperInfo}
 
 Create an initial empty structure that will be incrementally filled as we read through the content.
 
@@ -33,8 +20,8 @@ ${contentType === 'research-paper' ? `
 For research papers, create a structure with these sections:
 - background: Research background and motivation (initially empty)
 - problem: Problem statement and research gap (initially empty)
-- contribution: Main contributions (from paper context if available)
-- methodology: Methods and approach (from paper context if available)
+- contribution: Main contributions (initially empty)
+- methodology: Methods and approach (initially empty)
 - results: Key findings and results (initially empty)
 - conclusion: Conclusions and future work (initially empty)
 - technical_details: Important technical details (initially empty)
@@ -57,25 +44,10 @@ Output a JSON object representing this structure. Use empty strings "" for secti
         newChunk: string,
         chunkIndex: number,
         totalChunks: number,
-        contentType: string,
-        paperContext?: {
-            title: string;
-            mainContribution?: string;
-            researchQuestion?: string;
-            methodology?: string;
-        }
+        contentType: string
     ): string {
-        const paperInfo = paperContext ? `
-## Paper Context:
-Title: ${paperContext.title}
-${paperContext.researchQuestion ? `Research Question: ${paperContext.researchQuestion}` : ''}
-${paperContext.mainContribution ? `Main Contribution: ${paperContext.mainContribution}` : ''}
-${paperContext.methodology ? `Methodology: ${paperContext.methodology}` : ''}
-` : '';
-
         return `
 You are updating a condensed summary after reading part ${chunkIndex + 1} of ${totalChunks}.
-${paperInfo}
 
 ## Current Condensed Summary:
 ${currentSummary}
