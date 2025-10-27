@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import toast from 'react-hot-toast';
 import { db } from "../lib/db";
-// ... existing code ...
 import { AI, isAIAvailable } from "../lib/ai";
 import { getPageContent } from "../lib/helper";
 import { PageContent, StructuredData, CondensedPageContent } from "../lib/types";
@@ -19,6 +18,7 @@ import { ActionButtons } from "./components/ActionButtons";
 import { GraphButton } from "./components/GraphButton";
 import { Footer } from "./components/Footer";
 import { CustomToaster } from "./components/CustomToaster";
+import { updateAutoLinks } from "../lib/graph-utils";
 
 function App(): React.JSX.Element {
     const [isAiInitialized, setIsAiInitialized] = useState<boolean>(false);
@@ -317,101 +317,6 @@ function App(): React.JSX.Element {
         );
     }
 
-    // Auto-create links based on keyword similarity
-    const createAutoLinks = async (currentNodeId: number, currentNodeData: any): Promise<void> => {
-        console.log("Creating auto-links for node:", currentNodeId);
-
-        try {
-            // Get all existing nodes except the current one
-            const allNodes = await db.nodes.toArray();
-            const otherNodes = allNodes.filter(node => node.id !== currentNodeId);
-
-            if (otherNodes.length === 0) {
-                console.log("No other nodes to link with");
-                return;
-            }
-
-            // Extract keywords from current node
-            const currentKeywords = extractKeywords(currentNodeData.summary, currentNodeData.structuredData);
-
-            // Find similar nodes and create links
-            for (const otherNode of otherNodes) {
-                const otherKeywords = extractKeywords(otherNode.summary || '', otherNode.structuredData || {});
-                const similarity = calculateSimilarity(currentKeywords, otherKeywords);
-
-                // Create link if similarity is above threshold (e.g., 0.3)
-                if (similarity > 0.3) {
-                    // Check if link already exists
-                    const existingLink = await db.links
-                        .where('sourceId').equals(currentNodeId)
-                        .and(link => link.targetId === otherNode.id!)
-                        .first();
-
-                    if (!existingLink) {
-                        await db.links.add({
-                            sourceId: currentNodeId,
-                            targetId: otherNode.id!,
-                            reason: `Related topics: ${findCommonKeywords(currentKeywords, otherKeywords).join(', ')}`,
-                            createdAt: new Date()
-                        });
-                        console.log(`Created link: ${currentNodeId} -> ${otherNode.id}`);
-                    }
-                }
-            }
-        } catch (error) {
-            console.error("Error creating auto-links:", error);
-        }
-    };
-
-    // Extract keywords from text and structured data
-    const extractKeywords = (text: string, structuredData: any): Set<string> => {
-        const keywords = new Set<string>();
-
-        // Extract from text (convert to lowercase and split)
-        const words = text.toLowerCase()
-            .replace(/[^\w\s]/g, ' ')
-            .split(/\s+/)
-            .filter(word => word.length > 3); // Only words longer than 3 chars
-
-        words.forEach(word => keywords.add(word));
-
-        // Extract from structured data
-        Object.values(structuredData).forEach(value => {
-            if (typeof value === 'string') {
-                const valueWords = value.toLowerCase()
-                    .replace(/[^\w\s]/g, ' ')
-                    .split(/\s+/)
-                    .filter(word => word.length > 3);
-                valueWords.forEach(word => keywords.add(word));
-            } else if (Array.isArray(value)) {
-                value.forEach(item => {
-                    if (typeof item === 'string') {
-                        const itemWords = item.toLowerCase()
-                            .replace(/[^\w\s]/g, ' ')
-                            .split(/\s+/)
-                            .filter(word => word.length > 3);
-                        itemWords.forEach(word => keywords.add(word));
-                    }
-                });
-            }
-        });
-
-        return keywords;
-    };
-
-    // Calculate similarity between two sets of keywords (Jaccard similarity)
-    const calculateSimilarity = (keywords1: Set<string>, keywords2: Set<string>): number => {
-        const intersection = new Set([...keywords1].filter(k => keywords2.has(k)));
-        const union = new Set([...keywords1, ...keywords2]);
-
-        return union.size > 0 ? intersection.size / union.size : 0;
-    };
-
-    // Find common keywords between two sets
-    const findCommonKeywords = (keywords1: Set<string>, keywords2: Set<string>): string[] => {
-        return [...keywords1].filter(k => keywords2.has(k)).slice(0, 3); // Return top 3 common keywords
-    };
-
     // Handle saving to knowledge base
     const handleSaveToDatabase = async (): Promise<void> => {
         console.log("handleSaveToDatabase called");
@@ -471,7 +376,7 @@ function App(): React.JSX.Element {
 
             // Auto-create links with similar nodes
             if (nodeId) {
-                await createAutoLinks(nodeId, nodeData);
+                await updateAutoLinks(nodeId, nodeData);
             }
 
             console.log("Setting loadingPhase to null");
@@ -502,7 +407,7 @@ function App(): React.JSX.Element {
                 summarizeProgress={summarizeProgress}
             />
 
-            <div className={`transition-all duration-500 ${hasUserInteracted ? 'flex flex-row gap-6' : 'flex flex-col'}`}>
+            <div className={`transition-all duration-500 mb-4 ${hasUserInteracted ? 'flex flex-row gap-6' : 'flex flex-col'}`}>
                 <div className={`transition-all duration-500 ${hasUserInteracted ? 'w-1/2' : 'w-full'}`}>
                     {condensedContent && <ContentInfo condensedContent={condensedContent} />}
 
