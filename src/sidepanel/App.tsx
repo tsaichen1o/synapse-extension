@@ -296,6 +296,13 @@ function App(): React.JSX.Element {
 
     const handleDiscard = (): void => {
         console.log("Discarding current session...");
+
+        // Reset AI instance state
+        if (aiInstanceRef.current) {
+            aiInstanceRef.current.reset();
+            console.log("AI instance has been reset.");
+        }
+
         setInitialSummary("");
         setCurrentSummary("");
         setStructuredData({});
