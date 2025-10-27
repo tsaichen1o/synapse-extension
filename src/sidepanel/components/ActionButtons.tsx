@@ -5,9 +5,14 @@ interface ActionButtonsProps {
     loadingPhase: LoadingPhase;
     onDiscard: () => void;
     onSave: () => void;
+    saveCooldown: number | null;
+    onCancelAutoClear: () => void;
 }
 
-export function ActionButtons({ loadingPhase, onDiscard, onSave }: ActionButtonsProps): React.JSX.Element {
+export function ActionButtons({ loadingPhase, onDiscard, onSave, saveCooldown, onCancelAutoClear }: ActionButtonsProps): React.JSX.Element {
+    const isSaving = loadingPhase === "saving";
+    const isCooldown = saveCooldown !== null;
+
     return (
         <div className="mb-6 grid grid-cols-2 gap-3">
             <button
@@ -22,16 +27,23 @@ export function ActionButtons({ loadingPhase, onDiscard, onSave }: ActionButtons
             </button>
             <button
                 onClick={onSave}
-                disabled={loadingPhase !== null}
+                disabled={loadingPhase !== null || isCooldown}
                 className="w-full bg-white/60 backdrop-blur-md hover:bg-white/80 disabled:bg-gray-300/60 border border-purple-200 text-purple-700 font-semibold py-3 px-6 rounded-2xl transition-all duration-300 shadow-lg hover:shadow-xl disabled:shadow-none transform hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2"
             >
-                {loadingPhase === "saving" ? (
+                {isSaving ? (
                     <>
                         <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
                         <span>Saving...</span>
+                    </>
+                ) : isCooldown ? (
+                    <>
+                        <svg className="w-5 h-5 text-emerald-500 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        <span>Saved!</span>
                     </>
                 ) : (
                     <>
@@ -42,6 +54,23 @@ export function ActionButtons({ loadingPhase, onDiscard, onSave }: ActionButtons
                     </>
                 )}
             </button>
+            {isCooldown && (
+                <div className="col-span-2 flex items-center justify-between rounded-2xl border border-purple-200 bg-purple-50/70 px-4 py-3 text-sm text-purple-700 shadow-inner">
+                    <div className="flex items-center gap-2">
+                        <svg className="w-4 h-4 text-purple-500 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6l4 2" />
+                        </svg>
+                        <span className="font-medium">Preparing for next capture in {Math.max(saveCooldown ?? 0, 0)}s…</span>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={onCancelAutoClear}
+                        className="text-xs font-semibold text-purple-600 hover:text-purple-800 underline decoration-dotted"
+                    >
+                        Keep current session
+                    </button>
+                </div>
+            )}
         </div>
     );
 }

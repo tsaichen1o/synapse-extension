@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import toast from 'react-hot-toast';
 import { db } from "../lib/db";
 import { AI, isAIAvailable } from "../lib/ai";
@@ -42,6 +42,7 @@ function App(): React.JSX.Element {
 
     // State to trigger animations on update
     const [justUpdated, setJustUpdated] = useState<'summary' | 'structured' | 'both' | null>(null);
+    const [saveCooldown, setSaveCooldown] = useState<number | null>(null);
 
     const aiInstanceRef = useRef<AI | null>(null);
 
@@ -158,6 +159,7 @@ function App(): React.JSX.Element {
             return;
         }
 
+        setSaveCooldown(null);
         setLoadingPhase("capturing");
         setInitialSummary("");
         setStructuredData({});
@@ -277,7 +279,7 @@ function App(): React.JSX.Element {
         }
     };
 
-    const handleDiscard = (): void => {
+    const handleDiscard = useCallback((): void => {
         console.log("Discarding current session...");
 
         // Reset AI instance state
@@ -286,6 +288,7 @@ function App(): React.JSX.Element {
             console.log("AI instance has been reset.");
         }
 
+        setSaveCooldown(null);
         setInitialSummary("");
         setCurrentSummary("");
         setStructuredData({});
@@ -302,7 +305,31 @@ function App(): React.JSX.Element {
                 setCurrentPageUrl(tabs[0].url);
             }
         });
-    };
+    }, []);
+
+    useEffect(() => {
+        if (saveCooldown === null) return;
+        if (saveCooldown <= 0) {
+            handleDiscard();
+            return;
+        }
+
+        const timer = typeof window === "undefined"
+            ? null
+            : window.setTimeout(() => {
+                setSaveCooldown(prev => (prev == null ? null : Math.max(prev - 1, 0)));
+            }, 1000);
+
+        return () => {
+            if (timer !== null && typeof window !== "undefined") {
+                window.clearTimeout(timer);
+            }
+        };
+    }, [handleDiscard, saveCooldown]);
+
+    const handleCancelAutoClear = useCallback(() => {
+        setSaveCooldown(null);
+    }, []);
 
     // Show initialization screen if AI is not initialized
     if (!isAiInitialized) {
@@ -327,6 +354,7 @@ function App(): React.JSX.Element {
                 console.log("Validation failed: missing summary or structured data");
                 toast.error("Please capture page content first and let AI generate summary and structured information.");
                 setLoadingPhase(null);
+                setSaveCooldown(null);
                 return;
             }
 
@@ -381,6 +409,7 @@ function App(): React.JSX.Element {
 
             console.log("Setting loadingPhase to null");
             setLoadingPhase(null);
+            setSaveCooldown(5);
 
             // (Optional) Automatically open knowledge graph after saving
             // chrome.tabs.create({ url: 'graph.html' });
@@ -391,6 +420,7 @@ function App(): React.JSX.Element {
             const errorMessage = error instanceof Error ? error.message : "Unknown error";
             toast.error(`Save failed: ${errorMessage}`);
             setLoadingPhase(null);
+            setSaveCooldown(null);
         }
     };
 
@@ -481,6 +511,8 @@ function App(): React.JSX.Element {
                     loadingPhase={loadingPhase}
                     onDiscard={handleDiscard}
                     onSave={handleSaveToDatabase}
+                    saveCooldown={saveCooldown}
+                    onCancelAutoClear={handleCancelAutoClear}
                 />
             )}
 
