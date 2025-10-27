@@ -18,12 +18,6 @@ import * as d3 from 'd3'; // Import D3
 import { db, SynapseNode } from '../lib/db'; // Import our database
 import NodeDetailPanel from './NodeDetailPanel'; // Node detail panel component
 
-// Helper function to generate random initial node positions
-const getInitialNodePosition = () => ({
-    x: Math.random() * 800 + 100,
-    y: Math.random() * 500 + 50,
-});
-
 // Define the custom data type for our nodes
 interface NodeData {
     label: string;
@@ -229,10 +223,21 @@ function GraphApp() {
             </ReactFlow>
 
             {/* Node Detail Panel */}
-            {showNodeDetailPanel && (
+            {showNodeDetailPanel && selectedNodeData && (
                 <NodeDetailPanel
                     node={selectedNodeData}
                     onClose={() => setShowNodeDetailPanel(false)}
+                    onNodeUpdate={(updatedNode) => {
+                        // Update the node in the nodes array
+                        setNodes(currentNodes =>
+                            currentNodes.map(node =>
+                                node.id === updatedNode.id?.toString()
+                                    ? { ...node, data: { ...node.data, label: updatedNode.title, fullData: updatedNode } }
+                                    : node
+                            )
+                        );
+                        setSelectedNodeData(updatedNode);
+                    }}
                 />
             )}
         </div>
