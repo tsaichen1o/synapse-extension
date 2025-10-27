@@ -78,18 +78,28 @@ const buildValueViewGraph = (notes: SynapseNode[]): GraphBuildResult => {
                 noteId,
                 noteTitle: note.title || 'Untitled',
             });
-
-            links.push({
-                id: `structured:${noteId}:${valueNode.id}:${key}`,
-                sourceId: noteNode.id,
-                targetId: valueNode.id,
-                label: key,
-                meta: { key, value, type: 'structured' },
-            });
         });
     });
 
-    nodes.push(...valueNodes.values());
+    // Second pass: only add value nodes that have 2+ associations and their links
+    valueNodes.forEach(valueNode => {
+        const associationCount = valueNode.meta?.associations?.length ?? 0;
+        if (associationCount >= 2) {
+            nodes.push(valueNode);
+
+            // Add links for this value node
+            valueNode.meta?.associations?.forEach(assoc => {
+                links.push({
+                    id: `structured:${assoc.noteId}:${valueNode.id}:${assoc.key}`,
+                    sourceId: `note:${assoc.noteId}`,
+                    targetId: valueNode.id,
+                    label: assoc.key,
+                    meta: { key: assoc.key, value: valueNode.label, type: 'structured' },
+                });
+            });
+        }
+    });
+
     return { nodes, links };
 };
 
