@@ -34,11 +34,16 @@ export function ContentInfo({ condensedContent }: ContentInfoProps): React.JSX.E
                     </div>
                 </div>
                 {condensedContent.metadata.tags && condensedContent.metadata.tags.length > 0 && (
-                    <div className="mt-2 pt-2 border-t border-blue-200/50">
-                        <div className="flex flex-wrap gap-1">
-                            {condensedContent.metadata.tags.slice(0, 3).map((topic, idx) => (
-                                <span key={idx} className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
-                                    {topic}
+                    <div className="mt-3 pt-3 border-t border-blue-200/50">
+                        <h4 className="text-xs font-semibold text-gray-500 mb-2">Topics</h4>
+                        <div className="flex flex-wrap gap-1.5">
+                            {condensedContent.metadata.tags.slice(0, 5).map((tag, idx) => (
+                                <span
+                                    key={idx}
+                                    title={tag}
+                                    className="text-xs bg-blue-100 text-blue-800 px-2.5 py-1 rounded-full truncate max-w-[150px] hover:bg-blue-200 transition-colors"
+                                >
+                                    {tag}
                                 </span>
                             ))}
                         </div>
