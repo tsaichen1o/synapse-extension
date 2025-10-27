@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
+import toast from 'react-hot-toast';
 import { db } from "../lib/db";
+// ... existing code ...
 import { AI, isAIAvailable } from "../lib/ai";
 import { getPageContent } from "../lib/helper";
 import { PageContent, StructuredData, CondensedPageContent } from "../lib/types";
@@ -16,11 +18,11 @@ import { ChatInput } from "./components/ChatInput";
 import { ActionButtons } from "./components/ActionButtons";
 import { GraphButton } from "./components/GraphButton";
 import { Footer } from "./components/Footer";
+import { CustomToaster } from "./components/CustomToaster";
 
 function App(): React.JSX.Element {
     const [isAiInitialized, setIsAiInitialized] = useState<boolean>(false);
     const [isInitializing, setIsInitializing] = useState<boolean>(false);
-    const [initError, setInitError] = useState<string>("");
     const [loadingPhase, setLoadingPhase] = useState<LoadingPhase>(null);
     const [condenseProgress, setCondenseProgress] = useState<{ current: number; total: number } | null>(null);
     const [summarizeProgress, setSummarizeProgress] = useState<{ current: number; total: number } | null>(null);
@@ -121,13 +123,12 @@ function App(): React.JSX.Element {
     // Handle AI initialization triggered by user gesture
     const handleInitializeAI = async (): Promise<void> => {
         setIsInitializing(true);
-        setInitError("");
 
         try {
             const available = await isAIAvailable();
             if (!available) {
                 console.warn("AI is not available on this device");
-                setInitError("AI is not available on this device. Please check if Chrome Built-in AI is enabled.");
+                toast.error("AI is not available on this device. Please check if Chrome Built-in AI is enabled.");
                 setIsInitializing(false);
                 return;
             }
@@ -142,20 +143,18 @@ function App(): React.JSX.Element {
             console.log("AI instance ready");
             setIsAiInitialized(true);
             setIsInitializing(false);
+            toast.success("AI initialized successfully!");
         } catch (error) {
             console.error("Failed to initialize AI:", error);
             const errorMessage = error instanceof Error ? error.message : String(error);
-            setInitError(`Failed to initialize AI: ${errorMessage}`);
+            toast.error(`Failed to initialize AI: ${errorMessage}`);
             setIsInitializing(false);
         }
     };
 
     const handleCapturePage = async (): Promise<void> => {
         if (!aiInstanceRef.current) {
-            setChatMessages([{
-                sender: "ai",
-                text: "❌ AI is not ready. Please wait or refresh the page."
-            }]);
+            toast.error("AI is not ready. Please wait or refresh the page.");
             return;
         }
 
@@ -217,13 +216,7 @@ function App(): React.JSX.Element {
         } catch (error) {
             console.error("Capture or summarization failed:", error);
             const errorMessage = error instanceof Error ? error.message : "Unknown error";
-            setChatMessages((prev: ChatMessage[]) => [
-                ...prev,
-                {
-                    sender: "ai",
-                    text: `Oops! An error occurred during capture or summarization: ${errorMessage}`,
-                },
-            ]);
+            toast.error(`Capture or summarization failed: ${errorMessage}`);
             setLoadingPhase(null);
         }
     };
@@ -233,13 +226,7 @@ function App(): React.JSX.Element {
         if (!chatInput.trim()) return;
 
         if (!aiInstanceRef.current || !condensedContent) {
-            setChatMessages((prev: ChatMessage[]) => [
-                ...prev,
-                {
-                    sender: "ai",
-                    text: "❌ AI is not ready or no page content captured. Please capture a page first."
-                }
-            ]);
+            toast.error("AI is not ready or no page content captured. Please capture a page first.");
             return;
         }
 
@@ -285,11 +272,7 @@ function App(): React.JSX.Element {
         } catch (error) {
             console.error("Chat failed:", error);
             const errorMessage = error instanceof Error ? error.message : "Unknown error";
-            const aiMessage: ChatMessage = {
-                sender: "ai",
-                text: `Sorry, an error occurred while chatting with AI: ${errorMessage}`,
-            };
-            setChatMessages((prev: ChatMessage[]) => [...prev, aiMessage]);
+            toast.error(`Chat failed: ${errorMessage}`);
             setLoadingPhase(null);
         }
     };
@@ -324,11 +307,13 @@ function App(): React.JSX.Element {
     // Show initialization screen if AI is not initialized
     if (!isAiInitialized) {
         return (
-            <WelcomeScreen
-                isInitializing={isInitializing}
-                initError={initError}
-                onInitialize={handleInitializeAI}
-            />
+            <>
+                <CustomToaster />
+                <WelcomeScreen
+                    isInitializing={isInitializing}
+                    onInitialize={handleInitializeAI}
+                />
+            </>
         );
     }
 
@@ -435,13 +420,7 @@ function App(): React.JSX.Element {
             // Validate that we have content to save
             if (!currentSummary || Object.keys(structuredData).length === 0) {
                 console.log("Validation failed: missing summary or structured data");
-                setChatMessages((prev: ChatMessage[]) => [
-                    ...prev,
-                    {
-                        sender: "ai",
-                        text: "Please capture page content first and let AI generate summary and structured information."
-                    },
-                ]);
+                toast.error("Please capture page content first and let AI generate summary and structured information.");
                 setLoadingPhase(null);
                 return;
             }
@@ -481,31 +460,13 @@ function App(): React.JSX.Element {
                 await db.nodes.update(existingNode.id!, nodeData);
                 nodeId = existingNode.id!;
                 console.log(`Successfully updated node: ${nodeId}`);
-
-                const successMessage: ChatMessage = { sender: "ai", text: "✅ Successfully updated in knowledge base!" };
-                console.log("Adding success message:", successMessage);
-                setChatMessages((prev: ChatMessage[]) => {
-                    const newMessages = [...prev, successMessage];
-                    console.log("Previous messages count:", prev.length);
-                    console.log("New messages count:", newMessages.length);
-                    console.log("New chat messages:", newMessages);
-                    return newMessages;
-                });
+                toast.success("Successfully updated in knowledge base!");
             } else {
                 // Add new node
                 console.log("Adding new node");
                 nodeId = await db.nodes.add(nodeData);
                 console.log(`Successfully added new node: ${nodeId}`);
-
-                const successMessage: ChatMessage = { sender: "ai", text: "✅ Successfully saved to knowledge base!" };
-                console.log("Adding success message:", successMessage);
-                setChatMessages((prev: ChatMessage[]) => {
-                    const newMessages = [...prev, successMessage];
-                    console.log("Previous messages count:", prev.length);
-                    console.log("New messages count:", newMessages.length);
-                    console.log("New chat messages:", newMessages);
-                    return newMessages;
-                });
+                toast.success("Successfully saved to knowledge base!");
             }
 
             // Auto-create links with similar nodes
@@ -523,20 +484,16 @@ function App(): React.JSX.Element {
             console.error("Save failed with error:", error);
             console.error("Error stack:", error instanceof Error ? error.stack : "No stack trace");
             const errorMessage = error instanceof Error ? error.message : "Unknown error";
-            setChatMessages((prev: ChatMessage[]) => [
-                ...prev,
-                { sender: "ai", text: `Save failed: ${errorMessage}` },
-            ]);
+            toast.error(`Save failed: ${errorMessage}`);
             setLoadingPhase(null);
         }
     };
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50 px-6 pb-6 pt-12">
+            <CustomToaster />
             <Header />
-
             <URLDisplay url={currentPageUrl} />
-
             <CaptureButton
                 loadingPhase={loadingPhase}
                 hasInitialSummary={!!initialSummary}
