@@ -85,6 +85,13 @@ const D3Graph: React.FC = () => {
         setSelectedNode(null);
     };
 
+    const handleNodeUpdate = (updatedNode: SynapseNode) => {
+        setNodes(currentNodes =>
+            currentNodes.map(n => (n.id === updatedNode.id ? updatedNode : n))
+        );
+        setSelectedNode(updatedNode); // Keep the panel open with updated data
+    };
+
     useEffect(() => {
         if (!canvasRef.current || nodes.length === 0) return;
 
@@ -204,7 +211,11 @@ const D3Graph: React.FC = () => {
         <div className="w-full h-full relative">
             <canvas ref={canvasRef}></canvas>
             {selectedNode && (
-                <NodeDetailPanel node={selectedNode} onClose={handleClosePanel} />
+                <NodeDetailPanel
+                    node={selectedNode}
+                    onClose={handleClosePanel}
+                    onNodeUpdate={handleNodeUpdate}
+                />
             )}
         </div>
     );

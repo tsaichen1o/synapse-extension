@@ -20,6 +20,7 @@ export interface SynapseLink {
     targetId: number;
     reason: string;
     createdAt: Date;
+    type?: 'auto' | 'manual';
 }
 
 // Define the database schema
@@ -41,6 +42,13 @@ db.version(2).stores({
     nodes: '++id, type, url, title, createdAt, updatedAt', // Added updatedAt, removed unique constraint from url
     links: '++id, sourceId, targetId, reason, createdAt' // Links table unchanged
 });
+
+// Version 3: Add type to links
+db.version(3).stores({
+    nodes: '++id, type, url, title, createdAt, updatedAt',
+    links: '++id, sourceId, targetId, reason, createdAt, type'
+});
+
 
 // 在開發模式下，你可以導出一些方便的函式來清空資料庫
 if (import.meta.env?.DEV) {
@@ -134,28 +142,32 @@ if (import.meta.env?.DEV) {
             sourceId: node2 as number,
             targetId: node1 as number,
             reason: 'BERT builds upon the Transformer architecture',
-            createdAt: new Date()
+            createdAt: new Date(),
+            type: 'manual'
         });
 
         await db.links.add({
             sourceId: node3 as number,
             targetId: node1 as number,
             reason: 'GPT-3 uses Transformer decoder architecture',
-            createdAt: new Date()
+            createdAt: new Date(),
+            type: 'manual'
         });
 
         await db.links.add({
             sourceId: node4 as number,
             targetId: node3 as number,
             reason: 'Chain-of-thought prompting enhances GPT-3 reasoning',
-            createdAt: new Date()
+            createdAt: new Date(),
+            type: 'manual'
         });
 
         await db.links.add({
             sourceId: node5 as number,
             targetId: node1 as number,
             reason: 'Llama 2 based on Transformer architecture',
-            createdAt: new Date()
+            createdAt: new Date(),
+            type: 'manual'
         });
 
         console.log("Mock data added successfully! 5 nodes and 4 links created.");
