@@ -1,215 +1,222 @@
-// src/graph/D3Graph.tsx
-import React, { useEffect, useRef, useState } from 'react';
-import * as d3 from 'd3';
-import { db, SynapseNode, SynapseLink } from '../lib/db';
+
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import NodeDetailPanel from './NodeDetailPanel';
+import { SynapseNode } from '../lib/db';
+import { useGraphData } from './hooks/useGraphData';
+import { useGraphSimulation } from './hooks/useGraphSimulation';
+import { buildGraphData } from './utils/graphBuilders';
+import { GraphLinkData, GraphNodeData, GraphViewMode, NodeKind } from './types';
 
-// Define simulation data types that D3 will use
-interface SimulationNode extends d3.SimulationNodeDatum {
-    id: string;
-    data: SynapseNode;
+interface InfoPanelData {
+    title: string;
+    lines: string[];
 }
 
-interface SimulationLink extends d3.SimulationLinkDatum<SimulationNode> {
-    id: string;
-    data: SynapseLink;
-}
+const NODE_COLORS: Record<NodeKind, string> = {
+    note: '#7f9cf5',
+    value: '#f6ad55',
+    cluster: '#68d391',
+};
+
+const BASE_NODE_RADIUS: Record<NodeKind, number> = {
+    note: 18,
+    value: 12,
+    cluster: 24,
+};
+
+const LINK_COLOR_MAP: Record<'manual' | 'auto' | 'structured' | 'cluster', string> = {
+    manual: '#805ad5',
+    auto: '#63b3ed',
+    structured: '#a0aec0',
+    cluster: '#48bb78',
+};
+
+const LINK_WIDTH_MAP: Record<'manual' | 'auto' | 'structured' | 'cluster', number> = {
+    manual: 2.4,
+    auto: 1.8,
+    structured: 1.2,
+    cluster: 2,
+};
+
+const VIEW_OPTIONS: Array<{ value: GraphViewMode; label: string; hint: string }> = [
+    { value: 'value', label: 'Value Map', hint: 'Structured values become nodes; links show the field key' },
+    { value: 'note', label: 'Note Graph', hint: 'All notes with edges from manual links and shared metadata' },
+    { value: 'cluster', label: 'AI Cluster', hint: 'Notes grouped by keyword overlap into semantic clusters' },
+];
 
 const D3Graph: React.FC = () => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
-    const [nodes, setNodes] = useState<SynapseNode[]>([]);
-    const [links, setLinks] = useState<SynapseLink[]>([]);
+    const nodePositionsRef = useRef<Map<string, { x: number; y: number }>>(new Map());
+    const { nodes, links, updateNode } = useGraphData();
+    const [viewMode, setViewMode] = useState<GraphViewMode>('value');
     const [selectedNode, setSelectedNode] = useState<SynapseNode | null>(null);
-
+    const [infoPanel, setInfoPanel] = useState<InfoPanelData | null>(null);
     useEffect(() => {
-        const fetchData = async () => {
-            let allNodes = await db.nodes.toArray();
-            let allLinks = await db.links.toArray();
+        setSelectedNode(null);
+        setInfoPanel(null);
+        nodePositionsRef.current.clear();
+    }, [viewMode]);
 
-            // If the database is empty, generate mock data for demonstration
-            if (allNodes.length === 0) {
-                console.log("Database is empty. Generating mock data.");
-                const mockNodes: SynapseNode[] = [
-                    { id: 1, type: 'paper', url: 'https://example.com/llm-review', title: 'LLM Review', summary: 'A review of Large Language Models.', structuredData: {}, createdAt: new Date(), updatedAt: new Date() },
-                    { id: 2, type: 'concept', url: '', title: 'Transformer', summary: 'The core architecture of modern LLMs.', structuredData: {}, createdAt: new Date(), updatedAt: new Date() },
-                    { id: 3, type: 'paper', url: 'https://example.com/attention', title: 'Attention Is All You Need', summary: 'The original paper introducing the Transformer.', structuredData: {}, createdAt: new Date(), updatedAt: new Date() },
-                    { id: 4, type: 'tool', url: 'https://tensorflow.org', title: 'TensorFlow', summary: 'An open-source machine learning framework.', structuredData: {}, createdAt: new Date(), updatedAt: new Date() },
-                    { id: 5, type: 'concept', url: '', title: 'Deep Learning', summary: 'A subfield of machine learning.', structuredData: {}, createdAt: new Date(), updatedAt: new Date() },
-                ];
+    const graphData = useMemo(() => buildGraphData(viewMode, nodes, links), [viewMode, nodes, links]);
 
-                const mockLinks: SynapseLink[] = [
-                    { id: 1, sourceId: 1, targetId: 2, reason: 'Discusses', createdAt: new Date() }, // LLM Review -> Transformer
-                    { id: 2, sourceId: 3, targetId: 2, reason: 'Introduced', createdAt: new Date() }, // Attention Paper -> Transformer
-                    { id: 3, sourceId: 1, targetId: 5, reason: 'Is a part of', createdAt: new Date() }, // LLM Review -> Deep Learning
-                    { id: 4, sourceId: 4, targetId: 5, reason: 'Used for', createdAt: new Date() },   // TensorFlow -> Deep Learning
-                ];
+    const nodeLinkCount = useMemo(() => {
+        const counts = new Map<string, number>();
+        graphData.links.forEach(link => {
+            counts.set(link.sourceId, (counts.get(link.sourceId) ?? 0) + 1);
+            counts.set(link.targetId, (counts.get(link.targetId) ?? 0) + 1);
+        });
+        return counts;
+    }, [graphData]);
 
-                // You can choose to save mock data to DB or just use it for the session
-                // For now, just setting state without saving to DB
-                allNodes = mockNodes;
-                allLinks = mockLinks;
-            }
-
-            setNodes(allNodes);
-            setLinks(allLinks);
-        };
-
-        fetchData();
-
-        // Listen for database updates to re-render the graph
-        const observer = () => {
-            fetchData();
-        };
-        db.nodes.hook('creating', observer as any);
-        db.nodes.hook('updating', observer as any);
-        db.nodes.hook('deleting', observer as any);
-        db.links.hook('creating', observer);
-        db.links.hook('updating', observer);
-        db.links.hook('deleting', observer);
-
-        return () => {
-            db.nodes.hook('creating').unsubscribe(observer);
-            db.nodes.hook('updating').unsubscribe(observer);
-            db.nodes.hook('deleting').unsubscribe(observer);
-            db.links.hook('creating').unsubscribe(observer);
-            db.links.hook('updating').unsubscribe(observer);
-            db.links.hook('deleting').unsubscribe(observer);
-        };
+    const getLinkColor = useCallback((link: GraphLinkData) => {
+        const type = link.meta?.type ?? 'manual';
+        return LINK_COLOR_MAP[type] ?? LINK_COLOR_MAP.manual;
     }, []);
 
-    const onNodeClick = (node: SynapseNode) => {
-        setSelectedNode(node);
-    };
+    const getLinkWidth = useCallback((link: GraphLinkData) => {
+        const type = link.meta?.type ?? 'manual';
+        const base = LINK_WIDTH_MAP[type] ?? LINK_WIDTH_MAP.manual;
+
+        if (type === 'structured') {
+            const detailLength = (link.meta?.value?.length ?? 0) + (link.meta?.key ? 4 : 0);
+            return Math.min(base + Math.log1p(detailLength) * 0.25, base + 1.2);
+        }
+
+        if (type === 'auto') {
+            const similarity = link.meta?.similarity ?? 0;
+            return Math.min(base + similarity * 3, base + 1.5);
+        }
+
+        if (type === 'cluster') {
+            return base + 0.6;
+        }
+
+        return base;
+    }, []);
+
+    const getNodeFill = useCallback((node: GraphNodeData) => NODE_COLORS[node.type] ?? '#a0aec0', []);
+
+    const handleNodeClick = useCallback((graphNode: GraphNodeData) => {
+        if (graphNode.type === 'note' && graphNode.originalNode) {
+            setSelectedNode(graphNode.originalNode);
+            setInfoPanel(null);
+            return;
+        }
+
+        if (graphNode.type === 'value' && graphNode.meta?.associations) {
+            const lines = graphNode.meta.associations.map(assoc => `${assoc.key} ← ${assoc.noteTitle}`);
+            setInfoPanel({
+                title: graphNode.label,
+                lines: lines.length > 0 ? lines : ['No linked notes yet.'],
+            });
+            setSelectedNode(null);
+            return;
+        }
+
+        if (graphNode.type === 'cluster') {
+            const lines: string[] = [];
+            if (graphNode.meta?.clusterSize != null) {
+                lines.push(`Items: ${graphNode.meta.clusterSize}`);
+            }
+            if (graphNode.meta?.keywords && graphNode.meta.keywords.length > 0) {
+                lines.push(`Keywords: ${graphNode.meta.keywords.join(', ')}`);
+            }
+            setInfoPanel({
+                title: graphNode.label,
+                lines: lines.length > 0 ? lines : ['Cluster summary not available.'],
+            });
+            setSelectedNode(null);
+            return;
+        }
+
+        setInfoPanel(null);
+        setSelectedNode(null);
+    }, []);
+
+    const handleCanvasClick = useCallback(() => {
+        setSelectedNode(null);
+        setInfoPanel(null);
+    }, []);
 
     const handleClosePanel = () => {
         setSelectedNode(null);
     };
 
-    const handleNodeUpdate = (updatedNode: SynapseNode) => {
-        setNodes(currentNodes =>
-            currentNodes.map(n => (n.id === updatedNode.id ? updatedNode : n))
-        );
-        setSelectedNode(updatedNode); // Keep the panel open with updated data
+    const handleNodeUpdate = (updated: SynapseNode) => {
+        updateNode(updated);
+        setSelectedNode(updated);
     };
 
-    useEffect(() => {
-        if (!canvasRef.current || nodes.length === 0) return;
+    const getNodeRadius = useCallback(
+        (node: GraphNodeData) => {
+            const degreeBoost = nodeLinkCount.get(node.id) ?? 0;
 
-        const canvas = canvasRef.current;
-        const context = canvas.getContext('2d');
-        if (!context) return;
-
-        const width = canvas.parentElement?.clientWidth || 800;
-        const height = canvas.parentElement?.clientHeight || 600;
-        canvas.width = width;
-        canvas.height = height;
-
-        // Map our data to the format D3 simulation expects
-        const simNodes: SimulationNode[] = nodes.map(n => ({ id: n.id!.toString(), data: n, x: Math.random() * width, y: Math.random() * height }));
-        const simLinks: SimulationLink[] = links.map(l => ({
-            id: l.id!.toString(),
-            source: simNodes.find(n => n.id === l.sourceId.toString())!,
-            target: simNodes.find(n => n.id === l.targetId.toString())!,
-            data: l,
-        })).filter(l => l.source && l.target); // Filter out broken links
-
-        // Set up the D3 simulation
-        const simulation = d3.forceSimulation(simNodes)
-            .force('link', d3.forceLink<SimulationNode, SimulationLink>(simLinks).id(d => d.id).distance(150))
-            .force('charge', d3.forceManyBody().strength(-400))
-            .force('center', d3.forceCenter(width / 2, height / 2))
-            .on('tick', ticked);
-
-        function ticked() {
-            if (!context) return;
-            context.clearRect(0, 0, width, height);
-
-            // Draw links
-            context.strokeStyle = '#999';
-            context.globalAlpha = 0.6;
-            context.beginPath();
-            simLinks.forEach(d => {
-                context.moveTo((d.source as SimulationNode).x!, (d.source as SimulationNode).y!);
-                context.lineTo((d.target as SimulationNode).x!, (d.target as SimulationNode).y!);
-            });
-            context.stroke();
-
-            // Draw nodes
-            context.globalAlpha = 1.0;
-            simNodes.forEach(d => {
-                context.beginPath();
-                context.moveTo(d.x! + 15, d.y!);
-                context.arc(d.x!, d.y!, 15, 0, 2 * Math.PI);
-                context.fillStyle = getNodeColor(d.data.type);
-                context.fill();
-                context.strokeStyle = '#fff';
-                context.stroke();
-
-                // Draw labels
-                context.fillStyle = '#000';
-                context.font = '12px sans-serif';
-                context.textAlign = 'center';
-                context.fillText(d.data.title, d.x!, d.y! + 25);
-            });
-        }
-
-        // Drag functionality
-        d3.select<HTMLCanvasElement, SimulationNode>(canvas).call(d3.drag<HTMLCanvasElement, SimulationNode>()
-            .container(canvas)
-            .subject((event): d3.SubjectPosition | SimulationNode => {
-                // Increase search radius for better usability on canvas
-                const subject = simulation.find(event.x, event.y, 30);
-                return subject || event;
-            })
-            .on('start', dragstarted)
-            .on('drag', dragged)
-            .on('end', dragended));
-
-        function dragstarted(event: d3.D3DragEvent<HTMLCanvasElement, SimulationNode, any>) {
-            if (!event.active) simulation.alphaTarget(0.3).restart();
-            event.subject.fx = event.subject.x;
-            event.subject.fy = event.subject.y;
-        }
-        function dragged(event: d3.D3DragEvent<HTMLCanvasElement, SimulationNode, any>) {
-            event.subject.fx = event.x;
-            event.subject.fy = event.y;
-        }
-        function dragended(event: d3.D3DragEvent<HTMLCanvasElement, SimulationNode, any>) {
-            if (!event.active) simulation.alphaTarget(0);
-            event.subject.fx = null;
-            event.subject.fy = null;
-        }
-
-        // Click handler
-        d3.select(canvas).on('click', (event) => {
-            // Increase search radius for better usability on canvas
-            const node = simulation.find(event.offsetX, event.offsetY, 30);
-            if (node) {
-                onNodeClick(node.data);
+            if (node.type === 'value') {
+                const associations = node.meta?.associations?.length ?? 0;
+                const base = viewMode === 'value' ? 6 : BASE_NODE_RADIUS.value;
+                const boost = Math.min(6, Math.log2(associations + 1) * 2.2);
+                return base + boost;
             }
-        });
 
-        return () => {
-            simulation.stop();
-            // Clean up d3 event listeners
-            d3.select(canvas).on('click', null);
-            d3.select<HTMLCanvasElement, SimulationNode>(canvas).call(d3.drag<HTMLCanvasElement, SimulationNode>().on('start', null).on('drag', null).on('end', null));
-        };
+            if (node.type === 'note') {
+                const boost = Math.min(12, Math.log2(degreeBoost + 1) * 4);
+                return BASE_NODE_RADIUS.note + boost;
+            }
 
-    }, [nodes, links]);
+            if (node.type === 'cluster') {
+                const size = node.meta?.clusterSize ?? degreeBoost;
+                const boost = Math.min(18, Math.sqrt(size) * 3.2);
+                return BASE_NODE_RADIUS.cluster + boost;
+            }
 
-    const getNodeColor = (type: string) => {
-        switch (type) {
-            case 'paper': return '#667eea';
-            case 'concept': return '#f093fb';
-            case 'tool': return '#4facfe';
-            default: return '#a8edea';
-        }
-    };
+            return BASE_NODE_RADIUS.note;
+        },
+        [nodeLinkCount, viewMode],
+    );
+
+    useGraphSimulation({
+        canvasRef,
+        graphData,
+        nodePositionsRef,
+        getNodeRadius,
+        getLinkColor,
+        getLinkWidth,
+        getNodeFill,
+        onNodeClick: handleNodeClick,
+        onCanvasClick: handleCanvasClick,
+    });
 
     return (
         <div className="w-full h-full relative">
-            <canvas ref={canvasRef}></canvas>
+            <canvas ref={canvasRef} className="w-full h-full" />
+
+            <div className="absolute top-4 right-4 flex bg-white/90 border border-purple-100 shadow-lg rounded-full overflow-hidden text-sm font-medium text-purple-700">
+                {VIEW_OPTIONS.map(option => (
+                    <button
+                        key={option.value}
+                        onClick={() => setViewMode(option.value)}
+                        className={`px-4 py-2 transition-colors ${viewMode === option.value ? 'bg-purple-500 text-white' : 'hover:bg-purple-50'
+                            }`}
+                        title={option.hint}
+                    >
+                        {option.label}
+                    </button>
+                ))}
+            </div>
+
+            {infoPanel && (
+                <div className="absolute top-4 left-4 max-w-xs bg-white/95 border border-purple-100 shadow-xl rounded-xl px-4 py-3 text-sm text-gray-700 space-y-2">
+                    <h4 className="font-semibold text-purple-600">{infoPanel.title}</h4>
+                    <ul className="space-y-1">
+                        {infoPanel.lines.map((line, index) => (
+                            <li key={`${line}-${index}`} className="leading-snug">
+                                {line}
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            )}
+
             {selectedNode && (
                 <NodeDetailPanel
                     node={selectedNode}
