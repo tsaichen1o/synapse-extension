@@ -1,7 +1,6 @@
 // src/graph/main.tsx
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import GraphApp from './GraphApp'; // Graph application component
 import D3Graph from './D3Graph';
 import '../sidepanel/index.css'; // Import Tailwind CSS
 
