@@ -93,19 +93,8 @@ export interface CondensedPageContent {
     url: string;
     // Core content condensed to fit within token limits
     condensedContent: string;
-    // Key metadata extracted
-    metadata: {
-        description: string;
-        mainTopics: string[];
-        keyEntities: string[];
-        authors?: string[];
-        contentType: ContentType;
-        paperStructure?: PaperStructure;
-        /** Top/most-cited references (for research papers) */
-        topReferences?: Reference[];
-        /** Total reference count */
-        totalReferences?: number;
-    };
+    // Metadata directly from PageContent (no transformation)
+    metadata: PageContent['metadata'];
     // Original length info for reference
     originalLength: number;
     condensedLength: number;

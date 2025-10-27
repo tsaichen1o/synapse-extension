@@ -2,22 +2,43 @@
  * Injects content extraction logic into the current page context
  * 
  * Extraction priority:
- * 1. arXiv HTML (specialized extractor for research papers)
- * 2. Readability (general purpose, works well on articles)
- * 3. DOM extraction (fallback)
+ * 1. arXiv Abstract page (specialized extractor for paper metadata)
+ * 2. arXiv HTML (specialized extractor for full research papers)
+ * 3. Readability (general purpose, works well on articles)
+ * 4. DOM extraction (fallback)
  * 
  * All extractors now return standardized PageContent format
  * The last expression is returned as the script result to chrome.scripting.executeScript
  */
 
-import { extractPageContentWithReadability, extractPageContentFromDOM, extractArxivPaper } from '.';
+import {
+    extractPageContentWithReadability,
+    extractPageContentFromDOM,
+    extractArxivPaper,
+    extractArxivAbstract,
+    extractAmazonProduct,
+} from '.';
 
 (function () {
-    // Try arXiv extractor first
+    // Try arXiv abstract extractor first (for https://arxiv.org/abs/xxxx.xxxxx)
+    const arxivAbstractContent = extractArxivAbstract(document);
+    if (arxivAbstractContent) {
+        console.log("📑 arXiv abstract page detected - using specialized extractor");
+        return arxivAbstractContent;
+    }
+
+    // Try arXiv HTML paper extractor (for https://arxiv.org/html/xxxx.xxxxx)
     const arxivContent = extractArxivPaper(document);
     if (arxivContent) {
-        console.log("📚 arXiv paper detected - using specialized extractor");
+        console.log("📚 arXiv HTML paper detected - using specialized extractor");
         return arxivContent;
+    }
+
+    // Try Amazon product extractor
+    const amazonContent = extractAmazonProduct(document);
+    if (amazonContent) {
+        console.log("🛒 Amazon product page detected - using specialized extractor");
+        return amazonContent;
     }
 
     // Try Readability extractor

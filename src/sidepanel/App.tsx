@@ -457,8 +457,8 @@ function App(): React.JSX.Element {
                 // Store condensed content information
                 condensedContent: condensedContent?.condensedContent,
                 contentType: condensedContent?.metadata.contentType,
-                mainTopics: condensedContent?.metadata.mainTopics,
-                keyEntities: condensedContent?.metadata.keyEntities,
+                tags: condensedContent?.metadata.tags, // Changed from mainTopics to tags
+                description: condensedContent?.metadata.description,
                 compressionRatio: condensedContent?.compressionRatio,
                 originalLength: condensedContent?.originalLength,
                 condensedLength: condensedContent?.condensedLength,

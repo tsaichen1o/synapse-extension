@@ -1,8 +1,6 @@
 import { SummaryResponse, CondensedPageContent } from '../../types';
 import type { AI } from '../ai';
 import { normalizeStructuredData } from './utils';
-import { extractionSchema } from './schemas';
-import type { ContentExtraction } from './schemas';
 import { SummarizePrompts } from './prompts';
 import { getTemplate, generateSchemaFromTemplate, ContentTemplate } from './templates';
 import { AIErrors } from '../../errors';
@@ -43,22 +41,24 @@ export class SummarizeService {
             const template = getTemplate(contentType);
             if (this.onProgress) this.onProgress(1, totalSteps);
 
-            const { themes, structuredData } = await this.extractCombined(
+            const structuredData = await this.extractStructuredData(
                 content,
                 title,
                 template,
                 metadata
             );
-            this.appendPreExtractedMetadata(structuredData, metadata);
             if (this.onProgress) this.onProgress(2, totalSteps);
 
-            let summary = await this.generateSummary(content, themes, structuredData, template);
+            let summary = await this.generateSummary(content, structuredData, template, metadata);
             summary = summary.trim();
             if (this.onProgress) this.onProgress(3, totalSteps);
 
             return {
                 summary: summary,
-                structuredData: normalizeStructuredData(structuredData),
+                structuredData: {
+                    ...normalizeStructuredData(structuredData),
+                    ...input.metadata.extra
+                },
             };
 
         } catch (error) {
@@ -68,64 +68,19 @@ export class SummarizeService {
     }
 
     /**
-     * Append pre-extracted structured metadata directly to structured data
-     * These are already accurate and structured - no need for AI to re-process
+     * Extract structured data from content
      */
-    private appendPreExtractedMetadata(
-        structuredData: Record<string, any>,
-        metadata: CondensedPageContent['metadata']
-    ): void {
-        // For research papers, add references and academic metadata
-        if (metadata.contentType === 'research-paper') {
-            // Add top references (論文標題列表)
-            if (metadata.topReferences && metadata.topReferences.length > 0) {
-                console.log("📚 Appending pre-extracted references...");
-                structuredData.key_references = metadata.topReferences.slice(0, 5).map(ref => {
-                    return ref.title ||
-                        ref.label ||
-                        `${ref.authors?.join(', ') || 'Unknown'} (${ref.year || 'n.d.'})`;
-                });
-                console.log(`  ✓ Added ${structuredData.key_references.length} key references`);
-            }
-
-            // Add total reference count
-            if (metadata.totalReferences) {
-                structuredData.total_references = metadata.totalReferences;
-                console.log(`  ✓ Total references: ${metadata.totalReferences}`);
-            }
-        }
-
-        // Add other pre-extracted metadata if available
-        // 未來可以擴展：figures, tables, equations, etc.
-    }
-
-    /**
-     * Combined extraction step - gets both themes and structured data in one AI call
-     */
-    private async extractCombined(
+    private async extractStructuredData(
         content: string,
         title: string,
         template: ContentTemplate,
         metadata?: CondensedPageContent['metadata']
-    ): Promise<{
-        themes: ContentExtraction;
-        structuredData: Record<string, any>;
-    }> {
+    ): Promise<Record<string, any>> {
         try {
             const schema = generateSchemaFromTemplate(template);
-            const prompt = SummarizePrompts.combinedExtraction(content, title, template, metadata);
+            const prompt = SummarizePrompts.structuredDataExtraction(content, title, template, metadata);
 
-            const result = await this.ai.promptStructured<{
-                themes: ContentExtraction;
-                structuredData: Record<string, any>;
-            }>(prompt, {
-                type: 'object',
-                properties: {
-                    themes: extractionSchema,
-                    structuredData: schema
-                },
-                required: ['themes', 'structuredData']
-            });
+            const result = await this.ai.promptStructured<Record<string, any>>(prompt, schema);
 
             return result;
         } catch (error) {
@@ -135,16 +90,16 @@ export class SummarizeService {
     }
 
     /**
-     * Generate summary based on extracted themes and structured data
+     * Generate summary based on content and structured data
      */
     private async generateSummary(
         content: string,
-        themes: ContentExtraction,
         structuredData: Record<string, any>,
-        template: ContentTemplate
+        template: ContentTemplate,
+        metadata: CondensedPageContent['metadata']
     ): Promise<string> {
         try {
-            const prompt = SummarizePrompts.summaryWithTemplate(content, themes, structuredData, template);
+            const prompt = SummarizePrompts.summaryWithTemplate(content, structuredData, template, metadata);
             const summary = await this.ai.prompt(prompt);
             return summary;
         } catch (error) {

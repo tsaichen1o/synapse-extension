@@ -1,7 +1,5 @@
 import type { AI } from '../ai';
 import type { PageContent, CondensedPageContent } from '../../types';
-import { metadataExtractionSchema } from './schemas';
-import type { MetadataExtraction } from './schemas';
 import { CondensePrompts } from './prompts';
 
 
@@ -19,10 +17,15 @@ import { CondensePrompts } from './prompts';
  * - No special handling for different extractors - they all output the same format
  * - Adapts processing based on contentType metadata, not extractor type
  * 
+ * METADATA HANDLING:
+ * - Extractors are responsible for providing complete metadata
+ * - CondenseService does NOT re-extract metadata
+ * - Metadata is passed through unchanged from PageContent to CondensedPageContent
+ * 
  * Key benefits:
  * - Handles content of ANY size without hitting token limits
  * - Preserves all essential information
- * - Provides structured metadata for better AI processing
+ * - Reuses accurate metadata from extractors
  * - Reusable by SummarizeService and ChatService
  * 
  * Usage:
@@ -52,6 +55,7 @@ export class CondenseService {
      * This method handles content of any size by processing it in chunks
      * 
      * NOW UNIFIED: All content types go through the same pipeline
+     * Metadata is directly copied from PageContent without AI re-extraction
      */
     async condensePageContent(pageContent: PageContent): Promise<CondensedPageContent> {
         console.log("🔄 Starting iterative content condensing process...");
@@ -67,10 +71,9 @@ export class CondenseService {
             // Reset AI session for fresh context
             await this.ai.reset();
 
-            // Step 1: Extract or use existing metadata
-            console.log("🔍 Step 1: Preparing metadata...");
-            const metadata = await this.prepareMetadata(pageContent);
-            console.log("✓ Metadata ready:", metadata);
+            // Step 1: Use metadata from extractor (no AI re-extraction)
+            console.log("✓ Using metadata from extractor:", pageContent.metadata.contentType);
+            const contentType = pageContent.metadata.contentType;
 
             // Step 2: Split content into manageable chunks
             console.log("✂️  Step 2: Splitting content into chunks...");
@@ -79,23 +82,12 @@ export class CondenseService {
 
             // Step 3: Process chunks iteratively to condense
             console.log("🔄 Step 3: Processing chunks iteratively...");
-            const condensedContent = await this.processChunksIteratively(chunks, metadata.contentType, metadata);
+            const condensedContent = await this.processChunksIteratively(
+                chunks,
+                contentType,
+                pageContent.metadata.paperStructure
+            );
             console.log(`✓ Content condensed to ${condensedContent.length} chars`);
-
-            // Step 4: Select top references for research papers
-            let topReferences: any[] | undefined;
-            let totalReferences: number | undefined;
-
-            if (pageContent.metadata.contentType === 'research-paper' && pageContent.metadata.references) {
-                console.log("📚 Step 4: Selecting top references...");
-                const allReferences = pageContent.metadata.references;
-                totalReferences = allReferences.length;
-
-                // For now, simply take the first 15 references
-                // TODO: In the future, we could rank by citation frequency in the text
-                topReferences = allReferences.slice(0, 15);
-                console.log(`✓ Selected ${topReferences.length} out of ${totalReferences} references`);
-            }
 
             const compressionRatio = condensedContent.length / originalLength;
 
@@ -103,70 +95,18 @@ export class CondenseService {
                 title: pageContent.title || 'Untitled',
                 url: pageContent.url || '',
                 condensedContent,
-                metadata: {
-                    ...metadata,
-                    topReferences,
-                    totalReferences,
-                },
+                metadata: pageContent.metadata, // Direct copy, no transformation
                 originalLength,
                 condensedLength: condensedContent.length,
                 compressionRatio,
             };
 
             console.log(`✅ Condensing complete! Compression ratio: ${(compressionRatio * 100).toFixed(1)}%`);
-            if (topReferences) {
-                console.log(`📚 Included ${topReferences.length} top references in metadata`);
-            }
             return result;
 
         } catch (error) {
             console.error("❌ Error in condensePageContent:", error);
             throw error;
-        }
-    }
-
-    /**
-     * Prepare metadata - use existing metadata from extractors or extract with AI
-     */
-    private async prepareMetadata(pageContent: PageContent): Promise<MetadataExtraction> {
-        // If extractor already provided rich metadata, use it
-        if (pageContent.metadata.authors || pageContent.metadata.paperStructure) {
-            console.log("✓ Using metadata from extractor");
-            return {
-                description: pageContent.metadata.description || pageContent.abstract || 'No description available',
-                mainTopics: pageContent.metadata.tags || [],
-                keyEntities: [],
-                contentType: pageContent.metadata.contentType,
-                authors: pageContent.metadata.authors,
-                paperStructure: pageContent.metadata.paperStructure,
-            };
-        }
-
-        // Otherwise, extract metadata with AI
-        console.log("⚙️  Extracting metadata with AI...");
-        return await this.extractMetadata(pageContent);
-    }
-
-    /**
-     * Step 1: Extract metadata and identify content type
-     */
-    private async extractMetadata(pageContent: PageContent): Promise<MetadataExtraction> {
-        const prompt = CondensePrompts.metadata(pageContent);
-
-        try {
-            const metadata = await this.ai.promptStructured<MetadataExtraction>(
-                prompt,
-                metadataExtractionSchema
-            );
-            return metadata;
-        } catch (error) {
-            console.warn("⚠️  Failed to extract metadata, using defaults:", error);
-            return {
-                description: pageContent.metadata.description || pageContent.abstract || 'No description available',
-                mainTopics: pageContent.metadata.tags || [],
-                keyEntities: [],
-                contentType: pageContent.metadata.contentType || 'generic',
-            };
         }
     }
 
@@ -207,7 +147,7 @@ export class CondenseService {
     private async processChunksIteratively(
         chunks: string[],
         contentType: string,
-        metadata?: MetadataExtraction
+        paperStructure?: PageContent['metadata']['paperStructure']
     ): Promise<string> {
         const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
         if (totalLength <= this.TARGET_CONDENSED_LENGTH) {
@@ -216,19 +156,19 @@ export class CondenseService {
         }
 
         const totalSteps = chunks.length + 2;
-        const paperContext = contentType === 'research-paper' && metadata?.paperStructure
+        const paperContext = contentType === 'research-paper' && paperStructure
             ? {
-                title: metadata.description || '',
-                mainContribution: metadata.paperStructure.mainContribution,
-                researchQuestion: metadata.paperStructure.researchQuestion,
-                methodology: metadata.paperStructure.methodology
+                title: '', // Will be filled in initializeCondensedSummary
+                mainContribution: paperStructure.mainContribution,
+                researchQuestion: paperStructure.researchQuestion,
+                methodology: paperStructure.methodology
             }
             : undefined;
 
         let condensedSummary = await this.initializeCondensedSummary(
-            metadata?.description || '',
+            '', // Description not needed anymore
             contentType,
-            metadata?.paperStructure
+            paperStructure
         );
         if (this.onProgress) this.onProgress(1, totalSteps);
 
@@ -257,10 +197,13 @@ export class CondenseService {
     /**
      * Initialize condensed summary structure for incremental building
      */
+    /**
+     * Initialize condensed summary structure for incremental building
+     */
     private async initializeCondensedSummary(
         description: string,
         contentType: string,
-        paperStructure?: MetadataExtraction['paperStructure']
+        paperStructure?: PageContent['metadata']['paperStructure']
     ): Promise<string> {
         const paperContext = paperStructure ? {
             researchQuestion: paperStructure.researchQuestion,
@@ -366,7 +309,7 @@ export class CondenseService {
             const refined = await this.ai.prompt(prompt);
             return refined.trim();
         } catch (error) {
-            console.warn("⚠️  Refinement failed, using original");
+            console.warn("⚠️  Refinement failed, using original", error);
             return content;
         }
     }

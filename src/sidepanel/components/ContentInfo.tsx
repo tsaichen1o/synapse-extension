@@ -33,10 +33,10 @@ export function ContentInfo({ condensedContent }: ContentInfoProps): React.JSX.E
                         <span className="ml-1 font-semibold text-blue-600">{condensedContent.condensedLength.toLocaleString()} chars</span>
                     </div>
                 </div>
-                {condensedContent.metadata.mainTopics.length > 0 && (
+                {condensedContent.metadata.tags && condensedContent.metadata.tags.length > 0 && (
                     <div className="mt-2 pt-2 border-t border-blue-200/50">
                         <div className="flex flex-wrap gap-1">
-                            {condensedContent.metadata.mainTopics.slice(0, 3).map((topic, idx) => (
+                            {condensedContent.metadata.tags.slice(0, 3).map((topic, idx) => (
                                 <span key={idx} className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
                                     {topic}
                                 </span>

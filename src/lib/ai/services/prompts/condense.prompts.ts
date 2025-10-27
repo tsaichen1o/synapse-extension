@@ -1,53 +1,7 @@
-import type { PageContent } from '../../../types';
-
 /**
  * Prompt templates for CondenseService
  */
 export class CondensePrompts {
-    /**
-     * Extract metadata and identify content type
-     */
-    static metadata(pageContent: PageContent): string {
-        // Extract section titles if available
-        const sectionTitles = pageContent.metadata.sections
-            ?.map(s => s.title)
-            .slice(0, 10)
-            .join(', ') || 'None';
-
-        return `
-Analyze this web page and extract key metadata:
-
-Title: ${pageContent.title}
-URL: ${pageContent.url}
-Description: ${pageContent.metadata.description || 'None'}
-Section Headings: ${sectionTitles}
-
-First 1000 characters of content:
-${(pageContent.mainContent || pageContent.abstract || pageContent.fullText || '').substring(0, 1000)}
-
-IMPORTANT: If this is a research paper, article, or blog post, try to extract author information.
-Look for authors in:
-- Bylines at the beginning (e.g., "By John Doe")
-- Author sections or headers
-- Metadata
-- Signature areas at the end
-
-**FOR RESEARCH PAPERS**: Also extract the paper's core structure:
-- Main research question or problem addressed
-- Key contribution or novelty claim
-- Primary methodology/approach mentioned
-- Main findings or results (if visible in abstract/intro)
-
-Output a JSON object with these fields:
-- description: brief description (1-2 sentences)
-- mainTopics: array of 1-5 main topics (at least 1 topic required)
-- keyEntities: array of 0-5 key entities like people, places, organizations (can be empty if none found)
-- authors: array of author names if found (can be empty if no authors found)
-- contentType: one of "article", "documentation", "research-paper", "blog", "news", "tutorial", "other"
-- paperStructure: (ONLY for research-paper) object with { researchQuestion?, mainContribution?, methodology?, keyFindings? }
-        `.trim();
-    }
-
     /**
      * Initialize condensed summary structure for incremental building
      */
