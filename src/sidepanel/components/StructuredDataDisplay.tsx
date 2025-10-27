@@ -16,11 +16,12 @@ const TAG_MAX_LENGTH = 20;
 
 export function StructuredDataDisplay({ data, isFlashing = false }: StructuredDataDisplayProps): React.JSX.Element | null {
     if (Object.keys(data).length === 0) return null;
-    // View mode for structured data: 'list' (default) or 'tags'
-    const [viewMode, setViewMode] = useState<'list' | 'tags'>('list');
     const [modalData, setModalData] = useState<ModalData | null>(null);
 
     const entries = useMemo(() => Object.entries(data), [data]);
+    const MAX_TAGS = 12;
+    const visibleEntries = useMemo(() => entries.slice(0, MAX_TAGS), [entries]);
+    const hiddenCount = entries.length > MAX_TAGS ? entries.length - MAX_TAGS : 0;
 
     const truncateText = (text: string, maxLength: number = DEFAULT_MAX_TEXT_LENGTH): string => {
         if (text.length <= maxLength) return text;
@@ -35,34 +36,22 @@ export function StructuredDataDisplay({ data, isFlashing = false }: StructuredDa
         setModalData(null);
     };
 
-    const renderStructuredList = (): React.JSX.Element[] => {
-        return entries.map(([key, value]) => {
-            const displayValue = Array.isArray(value) ? value.join(', ') : String(value);
-            return (
-                <div key={key} className="group mb-2 p-3 bg-white/40 backdrop-blur-sm rounded-xl border border-white/20 hover:bg-white/60 transition-all duration-300 hover:shadow-md">
-                    <span className="font-semibold text-purple-900 block text-sm mb-1">{key}</span>
-                    <span className="text-gray-700 text-sm">{displayValue}</span>
-                </div>
-            );
-        });
-    };
-
     const renderBubbles = (): React.JSX.Element => {
         return (
             <div className="flex flex-wrap gap-x-2 gap-y-3">
-                {entries.map(([key, value]) => {
-                    // For arrays, show item count. For others, show the value.
+                {visibleEntries.map(([key, value]) => {
+                    const modalValue = Array.isArray(value) ? value : String(value);
                     const displayText = Array.isArray(value)
-                        ? `${value.length} items`
+                        ? `${value.length} item${value.length > 1 ? 's' : ''}`
                         : String(value);
-
                     const tagLabel = truncateText(displayText, TAG_MAX_LENGTH);
 
                     return (
-                        <div
+                        <button
                             key={key}
-                            className="flex items-center rounded-full bg-gray-200 shadow-sm transition-all duration-300 hover:scale-105 hover:shadow-lg cursor-pointer overflow-hidden"
-                            onClick={() => handleBubbleClick(key, value)}
+                            type="button"
+                            className="flex items-center rounded-full bg-gray-200 shadow-sm transition-all duration-300 hover:scale-105 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-purple-400 cursor-pointer overflow-hidden"
+                            onClick={() => handleBubbleClick(key, modalValue)}
                         >
                             <span className="px-3 py-1 bg-purple-200 text-purple-900 text-xs font-bold">
                                 {key}
@@ -70,54 +59,43 @@ export function StructuredDataDisplay({ data, isFlashing = false }: StructuredDa
                             <span className="px-3 py-1 text-gray-700 text-xs">
                                 {tagLabel}
                             </span>
-                        </div>
+                        </button>
                     );
                 })}
+
+                {hiddenCount > 0 && (
+                    <button
+                        type="button"
+                        className="px-4 py-1 rounded-full bg-purple-100 text-purple-700 text-xs font-semibold shadow-sm hover:bg-purple-200 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-purple-400"
+                        onClick={() => {
+                            const remaining = entries.slice(MAX_TAGS);
+                            const aggregatedValues = remaining.map(([entryKey, entryValue]) => {
+                                const text = Array.isArray(entryValue) ? entryValue.join(', ') : String(entryValue);
+                                return `${entryKey}: ${text}`;
+                            });
+                            handleBubbleClick(
+                                `+${hiddenCount} more`,
+                                aggregatedValues.length > 0 ? aggregatedValues : 'No additional data',
+                            );
+                        }}
+                    >
+                        +{hiddenCount} more
+                    </button>
+                )}
             </div>
         );
     };
 
     return (
         <div className={`mb-6 animate-fadeIn rounded-2xl ${isFlashing ? 'animate-flash' : ''}`}>
-            <div className="flex items-center justify-between gap-2 mb-3">
-                <div className="flex items-center gap-2">
-                    <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                    </svg>
-                    <h3 className="text-lg font-bold text-gray-800">Structured Information</h3>
-                </div>
-
-                <div className="flex items-center gap-2">
-                    <button
-                        onClick={() => setViewMode('list')}
-                        className={`px-3 py-1 rounded-md text-sm font-medium ${viewMode === 'list' ? 'bg-purple-950/10 text-purple-800' : 'bg-white/30 text-gray-700'} border border-white/10 transition-colors`}
-                        aria-pressed={viewMode === 'list'}
-                        title="List view"
-                        aria-label="List view"
-                        type="button"
-                    >
-                        List
-                    </button>
-                    <button
-                        onClick={() => setViewMode('tags')}
-                        className={`px-3 py-1 rounded-md text-sm font-medium ${viewMode === 'tags' ? 'bg-purple-950/10 text-purple-800' : 'bg-white/30 text-gray-700'} border border-white/10 transition-colors`}
-                        aria-pressed={viewMode === 'tags'}
-                        title="Tags view"
-                        aria-label="Tags view"
-                        type="button"
-                    >
-                        Tags
-                    </button>
-                </div>
+            <div className="flex items-center gap-2 mb-3">
+                <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                </svg>
+                <h3 className="text-lg font-bold text-gray-800">Structured Information</h3>
             </div>
 
-            <div>
-                {viewMode === 'list' ? (
-                    <div className="space-y-2">{renderStructuredList()}</div>
-                ) : (
-                    <div className="mt-2">{renderBubbles()}</div>
-                )}
-            </div>
+            <div className="mt-2">{renderBubbles()}</div>
 
             {/* Modal for full value display */}
             {modalData && (
