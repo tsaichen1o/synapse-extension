@@ -2,11 +2,10 @@ import React from "react";
 
 interface WelcomeScreenProps {
     isInitializing: boolean;
-    initError: string;
     onInitialize: () => void;
 }
 
-export function WelcomeScreen({ isInitializing, initError, onInitialize }: WelcomeScreenProps): React.JSX.Element {
+export function WelcomeScreen({ isInitializing, onInitialize }: WelcomeScreenProps): React.JSX.Element {
     return (
         <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50 p-6 flex items-center justify-center">
             <div className="max-w-md w-full">
@@ -66,20 +65,6 @@ export function WelcomeScreen({ isInitializing, initError, onInitialize }: Welco
                             </>
                         )}
                     </button>
-
-                    {initError && (
-                        <div className="mt-4 p-4 bg-red-50 rounded-xl border border-red-200 animate-fadeIn">
-                            <div className="flex items-start gap-2">
-                                <svg className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                                <div className="flex-1">
-                                    <p className="text-sm font-semibold text-red-800 mb-1">Initialization Error</p>
-                                    <p className="text-xs text-red-700">{initError}</p>
-                                </div>
-                            </div>
-                        </div>
-                    )}
                 </div>
 
                 <div className="text-center text-xs text-gray-500 space-y-1">
