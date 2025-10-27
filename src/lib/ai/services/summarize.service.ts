@@ -75,12 +75,12 @@ export class SummarizeService {
         title: string,
         template: ContentTemplate,
         metadata?: CondensedPageContent['metadata']
-    ): Promise<Record<string, any>> {
+    ): Promise<Record<string, unknown>> {
         try {
             const schema = generateSchemaFromTemplate(template);
             const prompt = SummarizePrompts.structuredDataExtraction(content, title, template, metadata);
 
-            const result = await this.ai.promptStructured<Record<string, any>>(prompt, schema);
+            const result = await this.ai.promptStructured<Record<string, unknown>>(prompt, schema);
 
             return result;
         } catch (error) {
@@ -94,7 +94,7 @@ export class SummarizeService {
      */
     private async generateSummary(
         content: string,
-        structuredData: Record<string, any>,
+        structuredData: Record<string, unknown>,
         template: ContentTemplate,
         metadata: CondensedPageContent['metadata']
     ): Promise<string> {

@@ -9,7 +9,7 @@
  * @param value - Any value from structured data
  * @returns Human-readable string representation
  */
-export function stringifyStructuredValue(value: any): string {
+export function stringifyStructuredValue(value: unknown): string {
     if (value === null || value === undefined) {
         return '';
     }
@@ -48,8 +48,8 @@ export function stringifyStructuredValue(value: any): string {
  * @param data - Raw structured data from AI response
  * @returns Normalized structured data with properly formatted values
  */
-export function normalizeStructuredData(data: Record<string, any>): Record<string, any> {
-    const normalized: Record<string, any> = {};
+export function normalizeStructuredData(data: Record<string, unknown>): Record<string, unknown> {
+    const normalized: Record<string, unknown> = {};
 
     for (const [key, value] of Object.entries(data)) {
         if (value === null || value === undefined) {

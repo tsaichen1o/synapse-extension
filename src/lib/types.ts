@@ -148,7 +148,7 @@ export interface PageContent {
         /** Subject categories (e.g., ["cs.AI", "cs.LG"]) */
         subjects?: string[];
         /** Extractor-specific extra data (AI Services should not depend on this) */
-        extra?: Record<string, any>;
+        extra?: Record<string, unknown>;
     };
 
     // === Optional Fields ===
@@ -167,7 +167,7 @@ export interface PageContent {
  * Structured data extracted from web page content
  * Flexible key-value pairs that can contain various types of information
  */
-export type StructuredData = Record<string, any>;
+export type StructuredData = Record<string, unknown>;
 
 // Type definitions for AI responses
 export interface SummaryResponse {

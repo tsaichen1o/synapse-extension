@@ -9,7 +9,7 @@ const SIMILARITY_THRESHOLD = 0.2; // Lowered threshold for more connections
  * @param structuredData The node's key-value structured data.
  * @returns A Set of unique keywords.
  */
-export const extractKeywords = (text: string, structuredData: any): Set<string> => {
+export const extractKeywords = (text: string, structuredData: Record<string, unknown>): Set<string> => {
     const keywords = new Set<string>();
     const stopWords = new Set(['the', 'a', 'an', 'in', 'is', 'of', 'and', 'to', 'for', 'from', 'on', 'with', 'as', 'by']);
 

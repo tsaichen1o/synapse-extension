@@ -51,7 +51,7 @@ export const intentAnalysisSchema = {
  */
 export interface Modification {
     modifiedSummary: string;
-    modifiedStructuredData: Record<string, any>;
+    modifiedStructuredData: Record<string, unknown>;
     changeDescription: string;
 }
 

@@ -1,6 +1,5 @@
 import type {
     AILanguageModelCreateOptions,
-    AILanguageModelPromptOptions,
     AILanguageModelSession,
     PageContent,
     StructuredData,
@@ -119,7 +118,7 @@ export class AI {
      * @param schema - JSON Schema object to constrain the response format
      * @param omitSchemaFromInput - If true, schema won't count against input quota (recommended)
      */
-    async promptStructured<T = any>(
+    async promptStructured<T = unknown>(
         prompt: string,
         schema: object,
         omitSchemaFromInput: boolean = true

@@ -27,7 +27,7 @@ function NodeDetailPanel({ node, onClose, onNodeUpdate }: NodeDetailPanelProps) 
         return null;
     }
 
-    const handleInputChange = (field: keyof SynapseNode, value: any) => {
+    const handleInputChange = <K extends keyof SynapseNode>(field: K, value: SynapseNode[K]) => {
         if (editableNode) {
             setEditableNode({ ...editableNode, [field]: value });
             setIsDirty(true);

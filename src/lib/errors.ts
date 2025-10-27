@@ -33,8 +33,8 @@ export class AIProcessingError extends Error {
         this.name = 'AIProcessingError';
 
         // Capture stack trace (V8-specific)
-        if ('captureStackTrace' in Error && typeof (Error as any).captureStackTrace === 'function') {
-            (Error as any).captureStackTrace(this, AIProcessingError);
+        if ('captureStackTrace' in Error && typeof (Error as { captureStackTrace: unknown }).captureStackTrace === 'function') {
+            (Error as { captureStackTrace: (target: object, constructorOpt?: unknown) => void }).captureStackTrace(this, AIProcessingError);
         }
     }
 

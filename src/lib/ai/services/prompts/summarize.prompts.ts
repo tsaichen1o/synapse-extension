@@ -63,7 +63,7 @@ ${metadata?.authors && metadata.authors.length > 0 ? `\n⚠️ **CRITICAL**: The
    */
   static summaryWithTemplate(
     content: string,
-    structuredData: Record<string, any>,
+    structuredData: Record<string, unknown>,
     template: ContentTemplate,
     metadata: CondensedPageContent['metadata']
   ): string {

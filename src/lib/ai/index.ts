@@ -52,7 +52,7 @@ if (!window.LanguageModel) {
                         aiResponse: "這是模擬的 AI 回應。"
                     });
                 },
-                promptStreaming: (text: string) => {
+                promptStreaming: (_text: string) => {
                     const encoder = new TextEncoder();
                     return new ReadableStream({
                         start(controller) {
@@ -61,7 +61,7 @@ if (!window.LanguageModel) {
                         }
                     }) as unknown as ReadableStream<string>;
                 },
-                append: async (messages: any[]) => {
+                append: async (messages: { role: 'user' | 'assistant' | 'system', content: string }[]) => {
                     console.log(`🧪 Mock append called with ${messages.length} message(s)`);
                     return Promise.resolve();
                 },

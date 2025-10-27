@@ -85,7 +85,7 @@ function App(): React.JSX.Element {
             }
         };
 
-        const handleTabActivated = (activeInfo: { tabId: number, windowId: number }) => {
+        const handleTabActivated = (_activeInfo: { tabId: number, windowId: number }) => {
             updateCurrentUrl();
         };
 
