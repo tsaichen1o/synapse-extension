@@ -37,7 +37,7 @@ export function ChatPanel({ messages, loadingPhase, chatContainerRef, isSticky =
         });
     };
 
-    const maxHeightClass = isSticky ? "max-h-[calc(100vh-250px)]" : "max-h-80";
+    const maxHeightClass = isSticky ? "max-h-[calc(100vh-196px)]" : "max-h-80";
 
     return (
         <div className="mb-6 animate-fadeIn">

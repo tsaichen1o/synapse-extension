@@ -407,7 +407,7 @@ function App(): React.JSX.Element {
                 summarizeProgress={summarizeProgress}
             />
 
-            <div className={`transition-all duration-500 ${hasUserInteracted ? 'flex flex-row gap-6' : 'flex flex-col'}`}>
+            <div className={`transition-all duration-500 mb-4 ${hasUserInteracted ? 'flex flex-row gap-6' : 'flex flex-col'}`}>
                 <div className={`transition-all duration-500 ${hasUserInteracted ? 'w-1/2' : 'w-full'}`}>
                     {condensedContent && <ContentInfo condensedContent={condensedContent} />}
 

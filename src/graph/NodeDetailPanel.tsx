@@ -1,5 +1,5 @@
 // src/graph/NodeDetailPanel.tsx
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { SynapseNode, db } from '../lib/db';
 import toast from 'react-hot-toast';
 import { updateAutoLinks } from '../lib/graph-utils';
@@ -34,13 +34,22 @@ function NodeDetailPanel({ node, onClose, onNodeUpdate }: NodeDetailPanelProps) 
         }
     };
 
-    const handleStructuredDataChange = (oldKey: string, newKey: string, value: string | string[]) => {
+    const handleStructuredDataChange = (oldKey: string, newKey: string, newValue: string) => {
         if (editableNode && editableNode.structuredData) {
             const newData = { ...editableNode.structuredData };
+            const originalValue = newData[oldKey];
+
+            // If the original value was an array, or the new string contains commas,
+            // treat the new value as a comma-separated list.
+            let finalValue: string | string[] = newValue;
+            if (Array.isArray(originalValue) || newValue.includes(',')) {
+                finalValue = newValue.split(',').map(s => s.trim()).filter(Boolean);
+            }
+
             if (oldKey !== newKey) {
                 delete newData[oldKey];
             }
-            newData[newKey] = value;
+            newData[newKey] = finalValue;
             setEditableNode({ ...editableNode, structuredData: newData });
             setIsDirty(true);
         }
@@ -153,7 +162,7 @@ function NodeDetailPanel({ node, onClose, onNodeUpdate }: NodeDetailPanelProps) 
                                             <input
                                                 type="text"
                                                 value={key}
-                                                onChange={(e) => handleStructuredDataChange(key, e.target.value, value)}
+                                                onChange={(e) => handleStructuredDataChange(key, e.target.value, Array.isArray(value) ? value.join(', ') : String(value))}
                                                 autoFocus
                                                 className="font-semibold text-purple-700 block text-sm mb-1 w-full bg-transparent border-b-2 border-purple-300 focus:outline-none"
                                                 placeholder="Key"

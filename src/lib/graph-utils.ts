@@ -88,11 +88,12 @@ export const updateAutoLinks = async (nodeId: number, nodeData: SynapseNode): Pr
             const otherKeywords = extractKeywords(otherNode.summary || '', otherNode.structuredData || {});
             const similarity = calculateSimilarity(currentKeywords, otherKeywords);
 
+            // Check if a link already exists in either direction
             const existingLink = await db.links
-                .where('[sourceId+targetId]')
-                .equals([nodeId, otherNode.id])
-                .or('[sourceId+targetId]')
-                .equals([otherNode.id, nodeId])
+                .filter(link =>
+                    (link.sourceId === nodeId && link.targetId === otherNode.id) ||
+                    (link.sourceId === otherNode.id && link.targetId === nodeId)
+                )
                 .first();
 
             if (similarity > SIMILARITY_THRESHOLD) {

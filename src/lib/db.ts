@@ -46,7 +46,7 @@ db.version(2).stores({
 // Version 3: Add type to links
 db.version(3).stores({
     nodes: '++id, type, url, title, createdAt, updatedAt',
-    links: '++id, sourceId, targetId, reason, createdAt, type'
+    links: '++id, sourceId, targetId, [sourceId+targetId], reason, createdAt, type'
 });
 
 
