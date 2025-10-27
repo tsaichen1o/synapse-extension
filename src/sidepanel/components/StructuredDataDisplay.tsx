@@ -16,7 +16,6 @@ export function StructuredDataDisplay({ data, isFlashing = false }: StructuredDa
     // View mode for structured data: 'list' (default) or 'tags'
     const [viewMode, setViewMode] = useState<'list' | 'tags'>('list');
     const [modalData, setModalData] = useState<ModalData | null>(null);
-    const [hoveredKey, setHoveredKey] = useState<string | null>(null);
 
     const entries = useMemo(() => Object.entries(data), [data]);
 
