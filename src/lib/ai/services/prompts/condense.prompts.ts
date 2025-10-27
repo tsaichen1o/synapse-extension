@@ -150,4 +150,36 @@ Instructions:
 Return ONLY the refined text.
         `.trim();
     }
+
+    /**
+     * Generate a concise title from condensed content
+     */
+    static generateConciseTitle(
+        originalTitle: string,
+        condensedContent: string,
+    ): string {
+        return `
+Generate a concise, informative title for this content.
+
+Original Title: ${originalTitle}
+
+Condensed Content Summary:
+${condensedContent}
+
+# Your Task
+Create a SHORT, clear title (maximum 10 words) that:
+1. Summarizes the main topic or focus
+2. Uses clear, straightforward language
+3. Is specific and informative
+4. Attracts reader interest
+
+**IMPORTANT**:
+- Maximum 10 words (strict limit)
+- No subtitle or colon unless absolutely necessary
+- Professional and clear
+- Must accurately reflect the content
+
+Return ONLY the title text, nothing else.
+        `.trim();
+    }
 }
