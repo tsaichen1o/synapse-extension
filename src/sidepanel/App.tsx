@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import toast, { Toaster, ToastBar } from 'react-hot-toast';
+import toast from 'react-hot-toast';
 import { db } from "../lib/db";
 // ... existing code ...
 import { AI, isAIAvailable } from "../lib/ai";
@@ -18,6 +18,7 @@ import { ChatInput } from "./components/ChatInput";
 import { ActionButtons } from "./components/ActionButtons";
 import { GraphButton } from "./components/GraphButton";
 import { Footer } from "./components/Footer";
+import { CustomToaster } from "./components/CustomToaster";
 
 function App(): React.JSX.Element {
     const [isAiInitialized, setIsAiInitialized] = useState<boolean>(false);
@@ -307,69 +308,16 @@ function App(): React.JSX.Element {
     if (!isAiInitialized) {
         return (
             <>
-                <Toaster
-                    position="top-center"
-                    toastOptions={{
-                        duration: 4000,
-                        style: {
-                            background: '#fff',
-                            color: '#374151',
-                            borderRadius: '0.5rem',
-                            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-                            padding: '0.75rem 1rem',
-                            fontSize: '0.875rem',
-                            fontWeight: '500',
-                        },
-                        success: {
-                            iconTheme: {
-                                primary: '#9333ea',
-                                secondary: '#fff',
-                            },
-                            style: {
-                                background: 'linear-gradient(to right, #f3e8ff, #fce7f3)',
-                                borderLeft: '4px solid #9333ea',
-                            },
-                        },
-                        error: {
-                            iconTheme: {
-                                primary: '#dc2626',
-                                secondary: '#fff',
-                            },
-                            style: {
-                                background: '#fef2f2',
-                                borderLeft: '4px solid #dc2626',
-                            },
-                        },
-                    }}
-                >
-                    {(t) => (
-                        <ToastBar toast={t}>
-                            {({ icon, message }) => (
-                                <>
-                                    {icon}
-                                    <div className="flex-1">{message}</div>
-                                    {t.type !== 'loading' && (
-                                        <button
-                                            className="p-1 rounded-full hover:bg-black/10 transition-colors"
-                                            onClick={() => toast.dismiss(t.id)}
-                                        >
-                                            <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                            </svg>
-                                        </button>
-                                    )}
-                                </>
-                            )}
-                        </ToastBar>
-                    )}
-                </Toaster>
+                <CustomToaster />
                 <WelcomeScreen
                     isInitializing={isInitializing}
                     onInitialize={handleInitializeAI}
                 />
             </>
         );
-    }    // Auto-create links based on keyword similarity
+    }
+
+    // Auto-create links based on keyword similarity
     const createAutoLinks = async (currentNodeId: number, currentNodeData: any): Promise<void> => {
         console.log("Creating auto-links for node:", currentNodeId);
 
@@ -543,64 +491,9 @@ function App(): React.JSX.Element {
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50 px-6 pb-6 pt-12">
-            <Toaster
-                position="top-center"
-                toastOptions={{
-                    duration: 4000,
-                    style: {
-                        background: '#fff',
-                        color: '#374151',
-                        borderRadius: '0.5rem',
-                        boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-                        padding: '0.75rem 1rem',
-                        fontSize: '0.875rem',
-                        fontWeight: '500',
-                    },
-                    success: {
-                        iconTheme: {
-                            primary: '#9333ea',
-                            secondary: '#fff',
-                        },
-                        style: {
-                            background: 'linear-gradient(to right, #f3e8ff, #fce7f3)',
-                            borderLeft: '4px solid #9333ea',
-                        },
-                    },
-                    error: {
-                        iconTheme: {
-                            primary: '#dc2626',
-                            secondary: '#fff',
-                        },
-                        style: {
-                            background: '#fef2f2',
-                            borderLeft: '4px solid #dc2626',
-                        },
-                    },
-                }}
-            >
-                {(t) => (
-                    <ToastBar toast={t}>
-                        {({ icon, message }) => (
-                            <>
-                                {icon}
-                                <div className="flex-1">{message}</div>
-                                {t.type !== 'loading' && (
-                                    <button
-                                        className="p-1 rounded-full hover:bg-black/10 transition-colors"
-                                        onClick={() => toast.dismiss(t.id)}
-                                    >
-                                        <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                        </svg>
-                                    </button>
-                                )}
-                            </>
-                        )}
-                    </ToastBar>
-                )}
-            </Toaster>
-            <Header />            <URLDisplay url={currentPageUrl} />
-
+            <CustomToaster />
+            <Header />
+            <URLDisplay url={currentPageUrl} />
             <CaptureButton
                 loadingPhase={loadingPhase}
                 hasInitialSummary={!!initialSummary}
