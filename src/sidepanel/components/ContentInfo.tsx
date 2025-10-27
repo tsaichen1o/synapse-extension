@@ -41,7 +41,8 @@ export function ContentInfo({ condensedContent }: ContentInfoProps): React.JSX.E
                                 <span
                                     key={idx}
                                     title={tag}
-                                    className="text-xs bg-blue-100 text-blue-800 px-2.5 py-1 rounded-full truncate max-w-[150px] hover:bg-blue-200 transition-colors"
+                                    className="text-xs bg-blue-100 text-blue-800 px-2.5 py-1 rounded-full truncate hover:bg-blue-200 transition-colors"
+                                    style={{ maxWidth: 'var(--tag-max-width, 150px)' }}
                                 >
                                     {tag}
                                 </span>

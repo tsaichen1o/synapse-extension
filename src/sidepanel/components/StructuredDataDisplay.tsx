@@ -11,6 +11,9 @@ interface ModalData {
     value: string | string[];
 }
 
+const DEFAULT_MAX_TEXT_LENGTH = 50;
+const TAG_MAX_LENGTH = 20;
+
 export function StructuredDataDisplay({ data, isFlashing = false }: StructuredDataDisplayProps): React.JSX.Element | null {
     if (Object.keys(data).length === 0) return null;
     // View mode for structured data: 'list' (default) or 'tags'
@@ -19,7 +22,7 @@ export function StructuredDataDisplay({ data, isFlashing = false }: StructuredDa
 
     const entries = useMemo(() => Object.entries(data), [data]);
 
-    const truncateText = (text: string, maxLength: number = 50): string => {
+    const truncateText = (text: string, maxLength: number = DEFAULT_MAX_TEXT_LENGTH): string => {
         if (text.length <= maxLength) return text;
         return text.substring(0, maxLength) + '...';
     };
@@ -53,7 +56,7 @@ export function StructuredDataDisplay({ data, isFlashing = false }: StructuredDa
                         ? `${value.length} items`
                         : String(value);
 
-                    const tagLabel = truncateText(displayText, 20);
+                    const tagLabel = truncateText(displayText, TAG_MAX_LENGTH);
 
                     return (
                         <div
