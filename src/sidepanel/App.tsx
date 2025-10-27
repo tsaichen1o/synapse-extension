@@ -369,7 +369,7 @@ function App(): React.JSX.Element {
             const nodeData = {
                 type: 'paper', // Assuming this is a paper; will be changed to dynamic template type later
                 url: currentPageUrl,
-                title: currentPageContent?.title || 'Unknown Title',
+                title: currentPageContent?.title || '',
                 summary: currentSummary, // Use the latest summary (may be edited via chat)
                 structuredData: structuredData, // Final Key-Value Pairs after AI collaboration
                 chatHistory: chatMessages, // Conversation history

@@ -36,13 +36,10 @@ import { CondensePrompts } from './prompts';
  * ```
  */
 export class CondenseService {
-    private onProgress?: (current: number, total: number) => void;
 
     constructor(protected ai: AI) { }
 
-    /**
-     * Set progress callback for real-time progress updates
-     */
+    private onProgress?: (current: number, total: number) => void;
     setProgressCallback(callback: (current: number, total: number) => void): void {
         this.onProgress = callback;
     }
@@ -84,18 +81,28 @@ export class CondenseService {
             console.log("🔄 Step 3: Processing chunks iteratively...");
             const condensedContent = await this.processChunksIteratively(
                 chunks,
-                contentType,
-                pageContent.metadata.paperStructure
+                contentType
             );
             console.log(`✓ Content condensed to ${condensedContent.length} chars`);
+
+            // Step 4: Generate concise title
+            console.log("✏️  Step 4: Generating concise title...");
+            const totalSteps = chunks.length <= 1 ? 3 : chunks.length + 3;
+            const conciseTitle = await this.generateConciseTitle(
+                pageContent.title || '',
+                condensedContent,
+                contentType
+            );
+            if (this.onProgress) this.onProgress(totalSteps, totalSteps);
+            console.log(`✓ Generated title: "${conciseTitle}"`);
 
             const compressionRatio = condensedContent.length / originalLength;
 
             const result: CondensedPageContent = {
-                title: pageContent.title || 'Untitled',
+                title: conciseTitle,
                 url: pageContent.url || '',
                 condensedContent,
-                metadata: pageContent.metadata, // Direct copy, no transformation
+                metadata: pageContent.metadata,
                 originalLength,
                 condensedLength: condensedContent.length,
                 compressionRatio,
@@ -118,7 +125,10 @@ export class CondenseService {
             return [content];
         }
 
-        const paragraphs = this.splitIntoParagraphs(content);
+        const paragraphs = content
+            .split(/\n+/)
+            .map(p => p.trim())
+            .filter(p => p.length > 0);
         const chunks: string[] = [];
         let currentChunk = '';
 
@@ -146,29 +156,23 @@ export class CondenseService {
      */
     private async processChunksIteratively(
         chunks: string[],
-        contentType: string,
-        paperStructure?: PageContent['metadata']['paperStructure']
+        contentType: string
     ): Promise<string> {
         const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
         if (totalLength <= this.TARGET_CONDENSED_LENGTH) {
             console.log("Content is already small enough, doing single refinement pass...");
-            return totalLength > 0 ? await this.refineContent(chunks.join('\n\n'), contentType) : '';
+            if (this.onProgress) this.onProgress(1, 3);
+            const ret = totalLength > 0 ? await this.refineContent(chunks.join('\n\n'), contentType) : '';
+            if (this.onProgress) this.onProgress(2, 3);
+            return ret;
         }
 
-        const totalSteps = chunks.length + 2;
-        const paperContext = contentType === 'research-paper' && paperStructure
-            ? {
-                title: '', // Will be filled in initializeCondensedSummary
-                mainContribution: paperStructure.mainContribution,
-                researchQuestion: paperStructure.researchQuestion,
-                methodology: paperStructure.methodology
-            }
-            : undefined;
+        // Total steps: 1 (init) + chunks.length (process chunks) + 1 (convert to text) + 1 (generate title)
+        const totalSteps = chunks.length + 3;
 
         let condensedSummary = await this.initializeCondensedSummary(
             '', // Description not needed anymore
-            contentType,
-            paperStructure
+            contentType
         );
         if (this.onProgress) this.onProgress(1, totalSteps);
 
@@ -180,8 +184,7 @@ export class CondenseService {
                 chunks[i],
                 i,
                 chunks.length,
-                contentType,
-                paperContext
+                contentType
             );
             if (this.onProgress) this.onProgress(i + 2, totalSteps);
 
@@ -189,7 +192,7 @@ export class CondenseService {
         }
 
         const finalText = await this.convertSummaryToText(condensedSummary, contentType);
-        if (this.onProgress) this.onProgress(totalSteps, totalSteps);
+        if (this.onProgress) this.onProgress(totalSteps - 1, totalSteps);
 
         return finalText;
     }
@@ -197,24 +200,13 @@ export class CondenseService {
     /**
      * Initialize condensed summary structure for incremental building
      */
-    /**
-     * Initialize condensed summary structure for incremental building
-     */
     private async initializeCondensedSummary(
         description: string,
-        contentType: string,
-        paperStructure?: PageContent['metadata']['paperStructure']
+        contentType: string
     ): Promise<string> {
-        const paperContext = paperStructure ? {
-            researchQuestion: paperStructure.researchQuestion,
-            mainContribution: paperStructure.mainContribution,
-            methodology: paperStructure.methodology
-        } : undefined;
-
         const prompt = CondensePrompts.initializeCondensedSummary(
             description,
-            contentType,
-            paperContext
+            contentType
         );
 
         try {
@@ -222,24 +214,7 @@ export class CondenseService {
             return structure.trim();
         } catch (error) {
             console.warn("⚠️  Failed to initialize summary structure:", error);
-            // Return a simple empty structure
-            if (contentType === 'research-paper') {
-                return JSON.stringify({
-                    background: "",
-                    problem: "",
-                    contribution: paperContext?.mainContribution || "",
-                    methodology: paperContext?.methodology || "",
-                    results: "",
-                    conclusion: "",
-                    technical_details: ""
-                });
-            } else {
-                return JSON.stringify({
-                    main_points: "",
-                    details: "",
-                    technical_info: ""
-                });
-            }
+            throw error;
         }
     }
 
@@ -251,21 +226,14 @@ export class CondenseService {
         newChunk: string,
         chunkIndex: number,
         totalChunks: number,
-        contentType: string,
-        paperContext?: {
-            title: string;
-            mainContribution?: string;
-            researchQuestion?: string;
-            methodology?: string;
-        }
+        contentType: string
     ): Promise<string> {
         const prompt = CondensePrompts.updateCondensedSummary(
             currentSummary,
             newChunk,
             chunkIndex,
             totalChunks,
-            contentType,
-            paperContext
+            contentType
         );
 
         try {
@@ -273,7 +241,7 @@ export class CondenseService {
             return updatedSummary.trim();
         } catch (error) {
             console.warn(`⚠️  Failed to update summary for chunk ${chunkIndex + 1}, keeping previous summary`);
-            return currentSummary;
+            throw error;
         }
     }
 
@@ -287,15 +255,8 @@ export class CondenseService {
             const narrative = await this.ai.prompt(prompt);
             return narrative.trim();
         } catch (error) {
-            console.warn("⚠️  Failed to convert to narrative, using structured form");
-            // If conversion fails, try to extract text from JSON structure
-            try {
-                const obj = JSON.parse(structuredSummary);
-                const parts = Object.values(obj).filter(v => typeof v === 'string' && v.trim());
-                return parts.join('\n\n');
-            } catch {
-                return structuredSummary;
-            }
+            console.warn("⚠️  Failed to convert to narrative, using structured form", error);
+            throw error;
         }
     }
 
@@ -310,19 +271,31 @@ export class CondenseService {
             return refined.trim();
         } catch (error) {
             console.warn("⚠️  Refinement failed, using original", error);
-            return content;
+            throw error;
         }
     }
 
     /**
-     * Split content into paragraphs
+     * Generate a concise title from condensed content
      */
-    private splitIntoParagraphs(content: string): string[] {
-        const paragraphs = content
-            .split(/\n+/)
-            .map(p => p.trim())
-            .filter(p => p.length > 0);
+    private async generateConciseTitle(
+        originalTitle: string,
+        condensedContent: string,
+        contentType: string
+    ): Promise<string> {
+        if (contentType === 'research-paper') return originalTitle;
 
-        return paragraphs;
+        const prompt = CondensePrompts.generateConciseTitle(
+            originalTitle,
+            condensedContent,
+        );
+
+        try {
+            const conciseTitle = await this.ai.prompt(prompt);
+            return conciseTitle.trim();
+        } catch (error) {
+            console.warn("⚠️  Failed to generate concise title, using original", error);
+            throw error;
+        }
     }
 }
