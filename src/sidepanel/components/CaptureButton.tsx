@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { LoadingPhase } from "../types";
 
 interface CaptureButtonProps {
@@ -9,39 +9,160 @@ interface CaptureButtonProps {
     summarizeProgress?: { current: number; total: number } | null;
 }
 
-export function CaptureButton({ loadingPhase, hasInitialSummary, onCapture, condenseProgress, summarizeProgress }: CaptureButtonProps): React.JSX.Element {
-    const [progress, setProgress] = useState(0);
-    const [prevPhase, setPrevPhase] = useState<LoadingPhase>(null);
+const ProgressBar: React.FC<{ progress: number; gradientClass: string }> = ({ progress, gradientClass }) => {
+    const barRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        if (condenseProgress && loadingPhase === "condensing") {
-            const realProgress = (condenseProgress.current / condenseProgress.total) * 100;
-            setProgress(realProgress);
+        if (!barRef.current) return;
+        const clamped = Math.max(0, Math.min(progress, 100));
+        barRef.current.style.width = `${clamped}%`;
+    }, [progress]);
+
+    return (
+        <div className="w-full max-w-xs h-2 bg-purple-100/50 rounded-full overflow-hidden">
+            <div
+                ref={barRef}
+                className={`h-full ${gradientClass} rounded-full transition-all duration-300 ease-out relative`}
+            >
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent animate-shimmer" />
+            </div>
+        </div>
+    );
+};
+
+export function CaptureButton({ loadingPhase, hasInitialSummary, onCapture, condenseProgress, summarizeProgress }: CaptureButtonProps): React.JSX.Element {
+    const [progress, setProgress] = useState(0);
+    const progressRef = useRef(0);
+    const animationFrameRef = useRef<number | null>(null);
+    const resetTimeoutRef = useRef<number | null>(null);
+    const activePhaseRef = useRef<LoadingPhase>(null);
+
+    const cancelAnimation = useCallback(() => {
+        if (animationFrameRef.current !== null) {
+            cancelAnimationFrame(animationFrameRef.current);
+            animationFrameRef.current = null;
+        }
+    }, []);
+
+    const setAnimatedProgress = useCallback(
+        (target: number, duration?: number) => {
+            const cappedTarget = Math.min(100, Math.max(0, target));
+            const startValue = progressRef.current;
+            const resolvedTarget = Math.max(startValue, cappedTarget);
+            if (resolvedTarget === startValue) {
+                return;
+            }
+
+            cancelAnimation();
+
+            const startTime = typeof performance !== 'undefined' ? performance.now() : Date.now();
+            const totalDuration = duration ?? Math.max(300, Math.abs(resolvedTarget - startValue) * 12);
+
+            const step = (timestamp: number) => {
+                const now = timestamp ?? (typeof performance !== 'undefined' ? performance.now() : Date.now());
+                const elapsed = now - startTime;
+                const ratio = totalDuration <= 0 ? 1 : Math.min(1, elapsed / totalDuration);
+                const value = startValue + (resolvedTarget - startValue) * ratio;
+                progressRef.current = value;
+                setProgress(value);
+
+                if (ratio < 1) {
+                    animationFrameRef.current = requestAnimationFrame(step);
+                } else {
+                    animationFrameRef.current = null;
+                }
+            };
+
+            animationFrameRef.current = requestAnimationFrame(step);
+        },
+        [cancelAnimation],
+    );
+
+    useEffect(() => () => {
+        cancelAnimation();
+        if (resetTimeoutRef.current !== null) {
+            window.clearTimeout(resetTimeoutRef.current);
+            resetTimeoutRef.current = null;
+        }
+    }, [cancelAnimation]);
+
+    useEffect(() => {
+        const prevPhase = activePhaseRef.current;
+        const hasCondenseProgress = condenseProgress != null;
+        const hasSummarizeProgress = summarizeProgress != null;
+
+        if (loadingPhase === 'condensing') {
+            if (prevPhase !== 'condensing') {
+                cancelAnimation();
+                if (resetTimeoutRef.current !== null) {
+                    window.clearTimeout(resetTimeoutRef.current);
+                    resetTimeoutRef.current = null;
+                }
+                progressRef.current = 0;
+                setProgress(0);
+                if (!hasCondenseProgress) {
+                    setAnimatedProgress(90, 6000);
+                }
+            }
+        } else if (loadingPhase === 'summarizing') {
+            if (prevPhase !== 'summarizing') {
+                cancelAnimation();
+                if (resetTimeoutRef.current !== null) {
+                    window.clearTimeout(resetTimeoutRef.current);
+                    resetTimeoutRef.current = null;
+                }
+                progressRef.current = 0;
+                setProgress(0);
+                if (!hasSummarizeProgress) {
+                    setAnimatedProgress(90, 6000);
+                }
+            }
+        } else {
+            if (prevPhase === 'condensing' || prevPhase === 'summarizing') {
+                setAnimatedProgress(100, 400);
+                if (resetTimeoutRef.current !== null) {
+                    window.clearTimeout(resetTimeoutRef.current);
+                }
+                resetTimeoutRef.current = window.setTimeout(() => {
+                    progressRef.current = 0;
+                    setProgress(0);
+                    resetTimeoutRef.current = null;
+                }, 650);
+            } else if (loadingPhase === null || loadingPhase === 'capturing') {
+                cancelAnimation();
+                if (resetTimeoutRef.current !== null) {
+                    window.clearTimeout(resetTimeoutRef.current);
+                    resetTimeoutRef.current = null;
+                }
+                progressRef.current = 0;
+                setProgress(0);
+            }
+        }
+
+        activePhaseRef.current = loadingPhase;
+    }, [loadingPhase, cancelAnimation, setAnimatedProgress, condenseProgress, summarizeProgress]);
+
+    useEffect(() => {
+        if (loadingPhase !== 'condensing' || !condenseProgress) {
             return;
         }
 
-        if (summarizeProgress && loadingPhase === "summarizing") {
-            const realProgress = (summarizeProgress.current / summarizeProgress.total) * 100;
-            setProgress(realProgress);
+        const total = Math.max(1, condenseProgress.total);
+        const rawTarget = (condenseProgress.current / total) * 100;
+        const target = Math.max(progressRef.current, rawTarget);
+        setAnimatedProgress(target);
+    }, [loadingPhase, condenseProgress, setAnimatedProgress]);
+
+    useEffect(() => {
+        if (loadingPhase !== 'summarizing' || !summarizeProgress) {
             return;
         }
 
-        // If phase changed from condensing/summarizing to something else, complete the progress
-        if ((prevPhase === "condensing" || prevPhase === "summarizing") &&
-            loadingPhase !== prevPhase &&
-            loadingPhase !== "condensing" &&
-            loadingPhase !== "summarizing") {
-            setProgress(100);
-            setTimeout(() => setProgress(0), 500); // Reset after brief completion display
-        }
-
-        setPrevPhase(loadingPhase);
-
-        // Fallback: If no real progress data available, reset
-        if (loadingPhase === null || loadingPhase === "capturing") {
-            setProgress(0);
-        }
-    }, [loadingPhase, prevPhase, condenseProgress, summarizeProgress]);
+        const total = Math.max(1, summarizeProgress.total);
+        const rawTarget = (summarizeProgress.current / total) * 100;
+        const target = Math.max(progressRef.current, rawTarget);
+        setAnimatedProgress(target);
+    }, [loadingPhase, summarizeProgress, setAnimatedProgress]);
 
     const buttonBaseClasses = "group w-full font-semibold py-4 px-6 rounded-2xl transition-all duration-300 shadow-lg flex items-center justify-center gap-3 transform";
 
@@ -77,21 +198,12 @@ export function CaptureButton({ loadingPhase, hasInitialSummary, onCapture, cond
                                 <svg className="animate-pulse h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                                 </svg>
-                                <span>
-                                    {condenseProgress
-                                        ? `Processing chunk ${condenseProgress.current}/${condenseProgress.total}...`
-                                        : 'Condensing content...'
-                                    }
-                                </span>
+                                <span>Condensing content...</span>
                             </div>
-                            <div className="w-full max-w-xs h-2 bg-purple-100/50 rounded-full overflow-hidden">
-                                <div
-                                    className="h-full bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 rounded-full transition-all duration-300 ease-out relative"
-                                    style={{ width: `${progress}%` }}
-                                >
-                                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent animate-shimmer"></div>
-                                </div>
-                            </div>
+                            <ProgressBar
+                                progress={progress}
+                                gradientClass="bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400"
+                            />
                             <span className="text-xs text-purple-200/90 font-medium">{Math.round(progress)}%</span>
                         </div>
                     </>
@@ -102,21 +214,12 @@ export function CaptureButton({ loadingPhase, hasInitialSummary, onCapture, cond
                                 <svg className="animate-pulse h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                                 </svg>
-                                <span>
-                                    {summarizeProgress
-                                        ? `AI analyzing step ${summarizeProgress.current}/${summarizeProgress.total}...`
-                                        : 'AI analyzing...'
-                                    }
-                                </span>
+                                <span>AI analyzing...</span>
                             </div>
-                            <div className="w-full max-w-xs h-2 bg-purple-100/50 rounded-full overflow-hidden">
-                                <div
-                                    className="h-full bg-gradient-to-r from-purple-400 via-pink-400 to-orange-400 rounded-full transition-all duration-300 ease-out relative"
-                                    style={{ width: `${progress}%` }}
-                                >
-                                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent animate-shimmer"></div>
-                                </div>
-                            </div>
+                            <ProgressBar
+                                progress={progress}
+                                gradientClass="bg-gradient-to-r from-purple-400 via-pink-400 to-orange-400"
+                            />
                             <span className="text-xs text-purple-200/90 font-medium">{Math.round(progress)}%</span>
                         </div>
                     </>
