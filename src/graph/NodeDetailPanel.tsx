@@ -10,17 +10,24 @@ interface NodeDetailPanelProps {
     onNodeUpdate: (updatedNode: SynapseNode) => void;
 }
 
+interface StructuredModalState {
+    originalKey: string;
+    key: string;
+    value: string;
+    treatAsArray: boolean;
+}
+
 function NodeDetailPanel({ node, onClose, onNodeUpdate }: NodeDetailPanelProps) {
     const [editableNode, setEditableNode] = useState<SynapseNode | null>(node);
     const [isDirty, setIsDirty] = useState(false);
     const [isEditingNotes, setIsEditingNotes] = useState(false);
-    const [editingDataKey, setEditingDataKey] = useState<string | null>(null);
+    const [structuredModal, setStructuredModal] = useState<StructuredModalState | null>(null);
 
     useEffect(() => {
         setEditableNode(node);
         setIsDirty(false); // Reset dirty state when a new node is selected
         setIsEditingNotes(false);
-        setEditingDataKey(null);
+        setStructuredModal(null);
     }, [node]);
 
     if (!editableNode) {
@@ -34,25 +41,92 @@ function NodeDetailPanel({ node, onClose, onNodeUpdate }: NodeDetailPanelProps) 
         }
     };
 
-    const handleStructuredDataChange = (oldKey: string, newKey: string, newValue: string) => {
-        if (editableNode && editableNode.structuredData) {
-            const newData = { ...editableNode.structuredData };
-            const originalValue = newData[oldKey];
+    const openStructuredModal = (key: string, rawValue: unknown) => {
+        const arrayValue = Array.isArray(rawValue);
+        let normalized = '';
 
-            // If the original value was an array, or the new string contains commas,
-            // treat the new value as a comma-separated list.
-            let finalValue: string | string[] = newValue;
-            if (Array.isArray(originalValue) || newValue.includes(',')) {
-                finalValue = newValue.split(',').map(s => s.trim()).filter(Boolean);
-            }
-
-            if (oldKey !== newKey) {
-                delete newData[oldKey];
-            }
-            newData[newKey] = finalValue;
-            setEditableNode({ ...editableNode, structuredData: newData });
-            setIsDirty(true);
+        if (arrayValue) {
+            normalized = rawValue.join(', ');
+        } else if (typeof rawValue === 'string') {
+            normalized = rawValue;
+        } else if (rawValue != null) {
+            normalized = String(rawValue);
         }
+
+        setStructuredModal({
+            originalKey: key,
+            key,
+            value: normalized,
+            treatAsArray: arrayValue,
+        });
+    };
+
+    const closeStructuredModal = () => {
+        setStructuredModal(null);
+    };
+
+    const parseStructuredValue = (input: string, forceArray: boolean): string | string[] => {
+        const normalized = input.replace(/\r\n/g, '\n');
+        const tokens = normalized
+            .split(/[\n,]/)
+            .map(segment => segment.trim())
+            .filter(Boolean);
+
+        if (forceArray || tokens.length > 1) {
+            return tokens;
+        }
+
+        return input.trim();
+    };
+
+    const handleStructuredModalSave = () => {
+        if (!editableNode || !editableNode.structuredData || !structuredModal) return;
+
+        const trimmedKey = structuredModal.key.trim();
+        const trimmedValue = structuredModal.value.trim();
+
+        if (!trimmedKey) {
+            toast.error('Field name cannot be empty.');
+            return;
+        }
+
+        if (!trimmedValue) {
+            toast.error('Value cannot be empty.');
+            return;
+        }
+
+        const parsedValue = parseStructuredValue(trimmedValue, structuredModal.treatAsArray);
+
+        // Validate that parsing didn't result in an empty array
+        if (Array.isArray(parsedValue) && parsedValue.length === 0) {
+            toast.error('Value cannot be empty.');
+            return;
+        }
+
+        const newData = { ...editableNode.structuredData };
+        if (structuredModal.originalKey !== trimmedKey) {
+            delete newData[structuredModal.originalKey];
+        }
+
+        newData[trimmedKey] = parsedValue;
+
+        setEditableNode({ ...editableNode, structuredData: newData });
+        setIsDirty(true);
+        closeStructuredModal();
+    };
+
+    const handleStructuredDelete = () => {
+        if (!editableNode || !editableNode.structuredData || !structuredModal) return;
+
+        const newData = { ...editableNode.structuredData };
+        delete newData[structuredModal.originalKey];
+
+        setEditableNode({
+            ...editableNode,
+            structuredData: newData,
+        });
+        setIsDirty(true);
+        closeStructuredModal();
     };
 
     const handleSave = async () => {
@@ -144,51 +218,36 @@ function NodeDetailPanel({ node, onClose, onNodeUpdate }: NodeDetailPanelProps) 
                             </svg>
                             Structured Information
                         </h3>
-                        <div className="space-y-2">
-                            {Object.entries(editableNode.structuredData).map(([key, value]) => (
-                                <div
-                                    key={key}
-                                    className="bg-white/60 backdrop-blur-sm p-3 rounded-lg border border-purple-100 group transition"
-                                >
-                                    {editingDataKey === key ? (
-                                        <div
-                                            onBlur={(e) => {
-                                                // Only exit edit mode if the new focused element is NOT inside this container
-                                                if (!e.currentTarget.contains(e.relatedTarget as Node)) {
-                                                    setEditingDataKey(null);
-                                                }
-                                            }}
-                                        >
-                                            <input
-                                                type="text"
-                                                value={key}
-                                                onChange={(e) => handleStructuredDataChange(key, e.target.value, Array.isArray(value) ? value.join(', ') : String(value))}
-                                                autoFocus
-                                                className="font-semibold text-purple-700 block text-sm mb-1 w-full bg-transparent border-b-2 border-purple-300 focus:outline-none"
-                                                placeholder="Key"
-                                            />
-                                            <textarea
-                                                value={Array.isArray(value) ? value.join(', ') : String(value)}
-                                                onChange={(e) => handleStructuredDataChange(key, key, e.target.value)}
-                                                className="text-gray-700 text-sm w-full bg-transparent border-b-2 border-purple-300 focus:outline-none resize-none"
-                                                rows={1}
-                                                placeholder="Value"
-                                            />
-                                        </div>
-                                    ) : (
-                                        <div
-                                            onClick={() => setEditingDataKey(key)}
-                                            className="cursor-pointer"
-                                            title="Click to edit"
-                                        >
-                                            <div className="font-semibold text-purple-700 text-sm mb-1">{key}</div>
-                                            <div className="text-gray-700 text-sm whitespace-pre-wrap">
-                                                {Array.isArray(value) ? value.join(', ') : String(value)}
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            ))}
+                        <div className="flex flex-wrap gap-x-2 gap-y-3">
+                            {Object.entries(editableNode.structuredData).map(([key, value]) => {
+                                const isArray = Array.isArray(value);
+                                const displayText = isArray ? `${value.length} item${value.length !== 1 ? 's' : ''}` : String(value);
+
+                                return (
+                                    <button
+                                        key={key}
+                                        type="button"
+                                        className="group flex items-center rounded-full bg-gray-200 shadow-sm transition-all duration-300 hover:scale-105 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-purple-400 overflow-hidden"
+                                        onClick={() => openStructuredModal(key, value)}
+                                        title="Edit structured data"
+                                    >
+                                        <span className="px-3 py-1 bg-purple-200 text-purple-900 text-xs font-bold">
+                                            {key}
+                                        </span>
+                                        <span className="px-3 py-1 text-gray-700 text-xs flex items-center gap-1">
+                                            {displayText.length > 32 ? `${displayText.slice(0, 29)}...` : displayText}
+                                            <svg
+                                                className="w-3.5 h-3.5 text-purple-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                viewBox="0 0 20 20"
+                                            >
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13.586 3.586a2 2 0 112.828 2.828l-7.5 7.5a2 2 0 01-.878.514l-3 1a.5.5 0 01-.63-.63l1-3a2 2 0 01.514-.878l7.5-7.5z" />
+                                            </svg>
+                                        </span>
+                                    </button>
+                                );
+                            })}
                         </div>
                     </div>
                 )}
@@ -231,6 +290,130 @@ function NodeDetailPanel({ node, onClose, onNodeUpdate }: NodeDetailPanelProps) 
                     <span>{isDirty ? 'Save Changes' : 'Saved'}</span>
                 </button>
             </div>
+
+            {structuredModal && (
+                <div
+                    className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 animate-fadeIn"
+                    onClick={closeStructuredModal}
+                >
+                    <div
+                        className="bg-white rounded-2xl shadow-2xl max-w-lg w-full mx-4 overflow-hidden animate-slideUp"
+                        onClick={event => event.stopPropagation()}
+                    >
+                        <div className="flex items-center justify-between p-6 border-b border-purple-100 bg-gradient-to-r from-purple-50 to-pink-50">
+                            <div className="flex items-center gap-3">
+                                <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                                </svg>
+                                <h3 className="text-lg font-semibold text-purple-900">Edit Structured Data</h3>
+                            </div>
+                            <button
+                                onClick={closeStructuredModal}
+                                className="p-2 rounded-lg hover:bg-white/60 transition-colors"
+                                aria-label="Close structured data editor"
+                            >
+                                <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        <div className="p-6 space-y-5">
+                            <div>
+                                <label className="block text-xs font-semibold text-purple-700 uppercase tracking-wide mb-1">
+                                    Field name
+                                </label>
+                                <input
+                                    type="text"
+                                    value={structuredModal.key}
+                                    onChange={event =>
+                                        setStructuredModal(current =>
+                                            current
+                                                ? {
+                                                    ...current,
+                                                    key: event.target.value,
+                                                }
+                                                : current,
+                                        )
+                                    }
+                                    className="w-full rounded-lg border border-purple-200 px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-purple-400"
+                                    placeholder="Enter field name"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-semibold text-purple-700 uppercase tracking-wide mb-1">
+                                    Value
+                                </label>
+                                <textarea
+                                    value={structuredModal.value}
+                                    onChange={event =>
+                                        setStructuredModal(current =>
+                                            current
+                                                ? {
+                                                    ...current,
+                                                    value: event.target.value,
+                                                }
+                                                : current,
+                                        )
+                                    }
+                                    rows={4}
+                                    className="w-full rounded-lg border border-purple-200 px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-purple-400 resize-y"
+                                    placeholder="Enter value or comma/newline separated list"
+                                />
+                                <label className="mt-2 inline-flex items-center gap-2 text-xs text-gray-600">
+                                    <input
+                                        type="checkbox"
+                                        checked={structuredModal.treatAsArray}
+                                        onChange={event =>
+                                            setStructuredModal(current =>
+                                                current
+                                                    ? {
+                                                        ...current,
+                                                        treatAsArray: event.target.checked,
+                                                    }
+                                                    : current,
+                                            )
+                                        }
+                                        className="rounded border-purple-300 text-purple-600 focus:ring-purple-500"
+                                    />
+                                    Treat as list (split by commas or new lines)
+                                </label>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-3 px-6 py-4 border-t border-purple-100 bg-gray-50">
+                            <button
+                                type="button"
+                                onClick={handleStructuredDelete}
+                                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M6 7h12M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2m-7 4v6m4-6v6M5 7l1 12a2 2 0 002 2h8a2 2 0 002-2l1-12" />
+                                </svg>
+                                Delete
+                            </button>
+
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={closeStructuredModal}
+                                    className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleStructuredModalSave}
+                                    className="px-5 py-2 text-sm font-semibold text-white rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 shadow-md hover:shadow-lg transition-all"
+                                >
+                                    Save
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
