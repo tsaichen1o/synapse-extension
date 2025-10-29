@@ -95,12 +95,20 @@ function NodeDetailPanel({ node, onClose, onNodeUpdate }: NodeDetailPanelProps) 
             return;
         }
 
+        const parsedValue = parseStructuredValue(trimmedValue, structuredModal.treatAsArray);
+
+        // Validate that parsing didn't result in an empty array
+        if (Array.isArray(parsedValue) && parsedValue.length === 0) {
+            toast.error('Value cannot be empty.');
+            return;
+        }
+
         const newData = { ...editableNode.structuredData };
         if (structuredModal.originalKey !== trimmedKey) {
             delete newData[structuredModal.originalKey];
         }
 
-        newData[trimmedKey] = parseStructuredValue(trimmedValue, structuredModal.treatAsArray);
+        newData[trimmedKey] = parsedValue;
 
         setEditableNode({ ...editableNode, structuredData: newData });
         setIsDirty(true);
