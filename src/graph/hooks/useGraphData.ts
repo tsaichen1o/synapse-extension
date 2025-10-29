@@ -133,10 +133,16 @@ export const useGraphData = () => {
         setNodes(current => current.map(node => (node.id === updated.id ? updated : node)));
     }, []);
 
+    const removeNode = useCallback((id: number) => {
+        setNodes(current => current.filter(node => node.id !== id));
+        setLinks(current => current.filter(link => link.sourceId !== id && link.targetId !== id));
+    }, []);
+
     return {
         nodes,
         links,
         updateNode,
+        removeNode,
         setNodes,
     };
 };

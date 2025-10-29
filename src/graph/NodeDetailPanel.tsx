@@ -9,6 +9,7 @@ interface NodeDetailPanelProps {
     node: SynapseNode | null;
     onClose: () => void;
     onNodeUpdate: (updatedNode: SynapseNode) => void;
+    onNodeDelete: (deletedNodeId: number) => void;
 }
 
 interface StructuredModalState {
@@ -18,17 +19,19 @@ interface StructuredModalState {
     treatAsArray: boolean;
 }
 
-function NodeDetailPanel({ node, onClose, onNodeUpdate }: NodeDetailPanelProps) {
+function NodeDetailPanel({ node, onClose, onNodeUpdate, onNodeDelete }: NodeDetailPanelProps) {
     const [editableNode, setEditableNode] = useState<SynapseNode | null>(node);
     const [isDirty, setIsDirty] = useState(false);
     const [isEditingNotes, setIsEditingNotes] = useState(false);
     const [structuredModal, setStructuredModal] = useState<StructuredModalState | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     useEffect(() => {
         setEditableNode(node);
         setIsDirty(false); // Reset dirty state when a new node is selected
         setIsEditingNotes(false);
         setStructuredModal(null);
+        setIsDeleting(false);
     }, [node]);
 
     if (!editableNode) {
@@ -131,7 +134,7 @@ function NodeDetailPanel({ node, onClose, onNodeUpdate }: NodeDetailPanelProps) 
     };
 
     const handleSave = async () => {
-        if (editableNode && isDirty) {
+        if (editableNode && isDirty && !isDeleting) {
             const nodeToSave = {
                 ...editableNode,
                 updatedAt: new Date(),
@@ -150,6 +153,43 @@ function NodeDetailPanel({ node, onClose, onNodeUpdate }: NodeDetailPanelProps) 
                 console.error("Failed to update node:", error);
                 toast.error('Failed to save changes.');
             }
+        }
+    };
+
+    const handleDeleteNode = async () => {
+        const nodeId = editableNode?.id;
+        if (nodeId == null || isDeleting) {
+            return;
+        }
+
+        const confirmed = window.confirm('Are you sure you want to delete this node? This action cannot be undone.');
+        if (!confirmed) {
+            return;
+        }
+
+        setIsDeleting(true);
+        closeStructuredModal();
+
+        try {
+            await db.transaction('rw', db.nodes, db.links, async () => {
+                await db.links
+                    .where('sourceId')
+                    .equals(nodeId)
+                    .or('targetId')
+                    .equals(nodeId)
+                    .delete();
+                await db.nodes.delete(nodeId);
+            });
+
+            toast.success('Node deleted successfully.');
+            onNodeDelete(nodeId);
+            onClose();
+            setEditableNode(null);
+        } catch (error) {
+            console.error('Failed to delete node:', error);
+            toast.error('Failed to delete node.');
+        } finally {
+            setIsDeleting(false);
         }
     };
 
@@ -278,18 +318,30 @@ function NodeDetailPanel({ node, onClose, onNodeUpdate }: NodeDetailPanelProps) 
             </div>
 
             <div className="px-6 py-9 border-t border-purple-200 mt-auto">
+                <div className="flex flex-col gap-4">
+                    <button
+                        type="button"
+                        onClick={handleDeleteNode}
+                        disabled={isDeleting || editableNode?.id == null}
+                        className="w-full border border-red-200 text-red-600 hover:text-white hover:bg-red-500 disabled:border-gray-200 disabled:text-gray-400 disabled:hover:bg-transparent disabled:cursor-not-allowed font-semibold py-3 px-6 rounded-xl transition-all duration-300 shadow-sm hover:shadow-md"
+                        title="Delete this node"
+                    >
+                        {isDeleting ? 'Deleting…' : 'Delete Node'}
+                    </button>
 
-                <button
-                    onClick={handleSave}
-                    disabled={!isDirty}
-                    className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed text-white font-semibold py-3 px-6 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl disabled:shadow-none transform hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2"
-                    title={isDirty ? 'Save your changes' : 'No changes to save'}
-                >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
-                    </svg>
-                    <span>{isDirty ? 'Save Changes' : 'Saved'}</span>
-                </button>
+                    <button
+                        type="button"
+                        onClick={handleSave}
+                        disabled={!isDirty || isDeleting}
+                        className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed text-white font-semibold py-3 px-6 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl disabled:shadow-none transform hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2"
+                        title={isDirty ? 'Save your changes' : 'No changes to save'}
+                    >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                        </svg>
+                        <span>{isDirty ? 'Save Changes' : 'Saved'}</span>
+                    </button>
+                </div>
             </div>
 
             {structuredModal && (
