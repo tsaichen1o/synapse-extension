@@ -162,7 +162,10 @@ function NodeDetailPanel({ node, onClose, onNodeUpdate, onNodeDelete }: NodeDeta
             return;
         }
 
-        const confirmed = window.confirm('Are you sure you want to delete this node? This action cannot be undone.');
+        const confirmMessage = isDirty
+            ? 'This node has unsaved changes that will be lost. Delete anyway?'
+            : 'Are you sure you want to delete this node? This action cannot be undone.';
+        const confirmed = window.confirm(confirmMessage);
         if (!confirmed) {
             return;
         }
@@ -173,10 +176,7 @@ function NodeDetailPanel({ node, onClose, onNodeUpdate, onNodeDelete }: NodeDeta
         try {
             await db.transaction('rw', db.nodes, db.links, async () => {
                 await db.links
-                    .where('sourceId')
-                    .equals(nodeId)
-                    .or('targetId')
-                    .equals(nodeId)
+                    .filter(link => link.sourceId === nodeId || link.targetId === nodeId)
                     .delete();
                 await db.nodes.delete(nodeId);
             });

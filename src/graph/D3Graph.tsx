@@ -47,7 +47,7 @@ const VIEW_OPTIONS: Array<{ value: GraphViewMode; label: string; hint: string }>
 const D3Graph: React.FC = () => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const nodePositionsRef = useRef<Map<string, { x: number; y: number }>>(new Map());
-    const { nodes, links, updateNode, removeNode } = useGraphData();
+    const { nodes, links, updateNode } = useGraphData();
     const [viewMode, setViewMode] = useState<GraphViewMode>('value');
     const [selectedNode, setSelectedNode] = useState<SynapseNode | null>(null);
     const [infoPanel, setInfoPanel] = useState<InfoPanelData | null>(null);
@@ -148,11 +148,10 @@ const D3Graph: React.FC = () => {
     };
 
     const handleNodeDelete = useCallback((deletedId: number) => {
-        removeNode(deletedId);
         nodePositionsRef.current.delete(`note:${deletedId}`);
         setSelectedNode(null);
         setInfoPanel(null);
-    }, [removeNode]);
+    }, []);
 
     const getNodeRadius = useCallback(
         (node: GraphNodeData) => {

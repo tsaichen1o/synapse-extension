@@ -242,13 +242,7 @@ function GraphApp() {
                         );
                         setSelectedNodeData(updatedNode);
                     }}
-                    onNodeDelete={(deletedId) => {
-                        setNodes(currentNodes =>
-                            currentNodes.filter(node => node.id !== deletedId.toString())
-                        );
-                        setEdges(currentEdges =>
-                            currentEdges.filter(edge => edge.source !== deletedId.toString() && edge.target !== deletedId.toString())
-                        );
+                    onNodeDelete={() => {
                         setSelectedNodeData(null);
                         setShowNodeDetailPanel(false);
                     }}
