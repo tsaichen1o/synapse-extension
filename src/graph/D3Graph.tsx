@@ -47,7 +47,7 @@ const VIEW_OPTIONS: Array<{ value: GraphViewMode; label: string; hint: string }>
 const D3Graph: React.FC = () => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const nodePositionsRef = useRef<Map<string, { x: number; y: number }>>(new Map());
-    const { nodes, links, updateNode } = useGraphData();
+    const { nodes, links, updateNode, refresh } = useGraphData();
     const [viewMode, setViewMode] = useState<GraphViewMode>('value');
     const [selectedNode, setSelectedNode] = useState<SynapseNode | null>(null);
     const [infoPanel, setInfoPanel] = useState<InfoPanelData | null>(null);
@@ -147,6 +147,15 @@ const D3Graph: React.FC = () => {
         setSelectedNode(updated);
     };
 
+    const handleNodeDelete = useCallback((deletedId: number) => {
+        nodePositionsRef.current.delete(`note:${deletedId}`);
+        setSelectedNode(null);
+        setInfoPanel(null);
+        refresh().catch(error => {
+            console.warn('Failed to refresh graph after deletion', error);
+        });
+    }, [refresh]);
+
     const getNodeRadius = useCallback(
         (node: GraphNodeData) => {
             const degreeBoost = nodeLinkCount.get(node.id) ?? 0;
@@ -222,6 +231,7 @@ const D3Graph: React.FC = () => {
                     node={selectedNode}
                     onClose={handleClosePanel}
                     onNodeUpdate={handleNodeUpdate}
+                    onNodeDelete={handleNodeDelete}
                 />
             )}
         </div>

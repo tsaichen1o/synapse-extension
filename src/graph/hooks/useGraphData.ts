@@ -87,47 +87,58 @@ export const useGraphData = () => {
     const [nodes, setNodes] = useState<SynapseNode[]>([]);
     const [links, setLinks] = useState<SynapseLink[]>([]);
 
+    const fetchData = useCallback(async () => {
+        let fetchedNodes = await db.nodes.toArray();
+        let fetchedLinks = await db.links.toArray();
+
+        if (fetchedNodes.length === 0) {
+            const mock = buildMockData();
+            fetchedNodes = mock.nodes;
+            fetchedLinks = mock.links;
+        }
+
+        setNodes(fetchedNodes);
+        setLinks(fetchedLinks);
+    }, []);
+
     useEffect(() => {
-        const fetchData = async () => {
-            let fetchedNodes = await db.nodes.toArray();
-            let fetchedLinks = await db.links.toArray();
+        fetchData().catch(error => {
+            console.warn('Failed to load graph data', error);
+        });
+    }, [fetchData]);
 
-            if (fetchedNodes.length === 0) {
-                const mock = buildMockData();
-                fetchedNodes = mock.nodes;
-                fetchedLinks = mock.links;
-            }
-
-            setNodes(fetchedNodes);
-            setLinks(fetchedLinks);
-        };
-
-        const refresh = () => {
+    useEffect(() => {
+        const scheduleRefresh = () => {
             fetchData().catch(error => {
                 console.warn('Failed to refresh graph data', error);
             });
         };
 
-        fetchData().catch(error => {
-            console.warn('Failed to load graph data', error);
-        });
+        const hookHandler = (...args: unknown[]) => {
+            const maybeTransaction = args[args.length - 1] as { on?: (event: 'complete', fn: () => void) => void } | undefined;
+            if (maybeTransaction?.on) {
+                maybeTransaction.on('complete', scheduleRefresh);
+            } else {
+                Promise.resolve().then(scheduleRefresh);
+            }
+        };
 
-        db.nodes.hook('creating', refresh);
-        db.nodes.hook('updating', refresh);
-        db.nodes.hook('deleting', refresh);
-        db.links.hook('creating', refresh);
-        db.links.hook('updating', refresh);
-        db.links.hook('deleting', refresh);
+        db.nodes.hook('creating', hookHandler);
+        db.nodes.hook('updating', hookHandler);
+        db.nodes.hook('deleting', hookHandler);
+        db.links.hook('creating', hookHandler);
+        db.links.hook('updating', hookHandler);
+        db.links.hook('deleting', hookHandler);
 
         return () => {
-            db.nodes.hook('creating').unsubscribe(refresh);
-            db.nodes.hook('updating').unsubscribe(refresh);
-            db.nodes.hook('deleting').unsubscribe(refresh);
-            db.links.hook('creating').unsubscribe(refresh);
-            db.links.hook('updating').unsubscribe(refresh);
-            db.links.hook('deleting').unsubscribe(refresh);
+            db.nodes.hook('creating').unsubscribe(hookHandler);
+            db.nodes.hook('updating').unsubscribe(hookHandler);
+            db.nodes.hook('deleting').unsubscribe(hookHandler);
+            db.links.hook('creating').unsubscribe(hookHandler);
+            db.links.hook('updating').unsubscribe(hookHandler);
+            db.links.hook('deleting').unsubscribe(hookHandler);
         };
-    }, []);
+    }, [fetchData]);
 
     const updateNode = useCallback((updated: SynapseNode) => {
         setNodes(current => current.map(node => (node.id === updated.id ? updated : node)));
@@ -137,6 +148,7 @@ export const useGraphData = () => {
         nodes,
         links,
         updateNode,
+        refresh: fetchData,
         setNodes,
     };
 };
