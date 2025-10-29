@@ -213,7 +213,7 @@ function NodeDetailPanel({ node, onClose, onNodeUpdate }: NodeDetailPanelProps) 
                         <div className="flex flex-wrap gap-x-2 gap-y-3">
                             {Object.entries(editableNode.structuredData).map(([key, value]) => {
                                 const isArray = Array.isArray(value);
-                                const displayText = isArray ? `${value.length} item${value.length > 1 ? 's' : ''}` : String(value);
+                                const displayText = isArray ? `${value.length} item${value.length !== 1 ? 's' : ''}` : String(value);
 
                                 return (
                                     <button
