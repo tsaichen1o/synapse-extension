@@ -1,7 +1,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import NodeDetailPanel from './NodeDetailPanel';
-import { SynapseNode } from '../lib/db';
+import type { SynapseNode } from '../lib/types';
 import { useGraphData } from './hooks/useGraphData';
 import { useGraphSimulation } from './hooks/useGraphSimulation';
 import { buildGraphData } from './utils/graphBuilders';

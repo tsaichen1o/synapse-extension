@@ -96,7 +96,7 @@ export class CondenseService {
             if (this.onProgress) this.onProgress(totalSteps, totalSteps);
             console.log(`✓ Generated title: "${conciseTitle}"`);
 
-            const compressionRatio = condensedContent.length / originalLength;
+            const compressionRate = condensedContent.length / originalLength;
 
             const result: CondensedPageContent = {
                 title: conciseTitle,
@@ -105,12 +105,11 @@ export class CondenseService {
                 metadata: pageContent.metadata,
                 originalLength,
                 condensedLength: condensedContent.length,
-                compressionRatio,
+                compressionRate: compressionRate,
             };
 
-            console.log(`✅ Condensing complete! Compression ratio: ${(compressionRatio * 100).toFixed(1)}%`);
+            console.log(`✅ Condensing complete! Compression ratio: ${(compressionRate * 100).toFixed(1)}%`);
             return result;
-
         } catch (error) {
             console.error("❌ Error in condensePageContent:", error);
             throw error;

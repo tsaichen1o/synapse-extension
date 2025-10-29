@@ -1,4 +1,4 @@
-import { SynapseNode, SynapseLink } from '../lib/db';
+import type { SynapseNode, SynapseLink } from '../lib/types';
 
 export type GraphViewMode = 'value' | 'note' | 'cluster';
 

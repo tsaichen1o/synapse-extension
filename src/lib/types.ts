@@ -5,6 +5,51 @@
  * https://developer.chrome.com/docs/ai/built-in
  */
 
+// ===== Core Database Models =====
+
+/**
+ * Synapse knowledge node stored in IndexedDB
+ */
+export interface SynapseNode {
+    id?: number;
+    type: string;
+    url: string;
+    title: string;
+    createdAt: Date;
+    updatedAt?: Date;
+    summary?: string;
+    structuredData?: Record<string, unknown>;
+    chatHistory?: Array<{ sender: "user" | "system" | "assistant"; text: string }>;
+}
+
+/**
+ * Link between two synapse nodes
+ */
+export interface SynapseLink {
+    id?: number;
+    sourceId: number;
+    targetId: number;
+    reason: string;
+    createdAt: Date;
+    type?: 'auto' | 'manual';
+}
+
+// ===== UI Component Types =====
+
+/**
+ * Chat message structure used in sidepanel
+ */
+export interface ChatMessage {
+    sender: "user" | "system" | "assistant";
+    text: string;
+}
+
+/**
+ * Loading phase indicators for UI feedback
+ */
+export type LoadingPhase = "capturing" | "condensing" | "summarizing" | "chatting" | "saving" | null;
+
+// ===== Content Extraction Types =====
 
 /**
  * Unified section structure for all content types
@@ -98,7 +143,7 @@ export interface CondensedPageContent {
     // Original length info for reference
     originalLength: number;
     condensedLength: number;
-    compressionRatio: number;
+    compressionRate: number;
 }
 
 // ===== Standardized Page Content =====

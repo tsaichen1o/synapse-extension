@@ -1,6 +1,7 @@
 // src/graph/NodeDetailPanel.tsx
 import { useState, useEffect } from 'react';
-import { SynapseNode, db } from '../lib/db';
+import { db } from '../lib/db';
+import type { SynapseNode } from '../lib/types';
 import toast from 'react-hot-toast';
 import { updateAutoLinks } from '../lib/graph-utils';
 

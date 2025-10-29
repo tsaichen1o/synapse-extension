@@ -1,35 +1,5 @@
 import Dexie, { type EntityTable } from "dexie";
-
-
-declare global {
-    interface Window {
-        clearSynapseDB: () => void;
-        addMockData: () => Promise<void>;
-    }
-}
-
-
-// Define interfaces for our database tables
-export interface SynapseNode {
-    id?: number;
-    type: string;
-    url: string;
-    title: string;
-    createdAt: Date;
-    updatedAt?: Date;
-    summary?: string;
-    structuredData?: Record<string, unknown>;
-    chatHistory?: Array<{ sender: "user" | "ai"; text: string }>;
-}
-
-export interface SynapseLink {
-    id?: number;
-    sourceId: number;
-    targetId: number;
-    reason: string;
-    createdAt: Date;
-    type?: 'auto' | 'manual';
-}
+import type { SynapseNode, SynapseLink } from "./types";
 
 // Define the database schema
 export interface SynapseDatabase extends Dexie {
@@ -50,7 +20,7 @@ db.version(2).stores({
     nodes: '++id, type, url, title, createdAt, updatedAt', // Added updatedAt, removed unique constraint from url
     links: '++id, sourceId, targetId, reason, createdAt' // Links table unchanged
 });
-// 在開發模式下，你可以導出一些方便的函式來清空資料庫
+
 if (import.meta.env?.DEV) {
     window.clearSynapseDB = (): void => {
         db.nodes.clear();

@@ -22,7 +22,7 @@ export function ContentInfo({ condensedContent }: ContentInfoProps): React.JSX.E
                     </div>
                     <div className="bg-white/50 rounded-lg px-2 py-1">
                         <span className="text-gray-500">Compression:</span>
-                        <span className="ml-1 font-semibold text-green-600">{(condensedContent.compressionRatio * 100).toFixed(0)}%</span>
+                        <span className="ml-1 font-semibold text-green-600">{(condensedContent.compressionRate * 100).toFixed(0)}%</span>
                     </div>
                     <div className="bg-white/50 rounded-lg px-2 py-1">
                         <span className="text-gray-500">Original:</span>
@@ -33,23 +33,6 @@ export function ContentInfo({ condensedContent }: ContentInfoProps): React.JSX.E
                         <span className="ml-1 font-semibold text-blue-600">{condensedContent.condensedLength.toLocaleString()} chars</span>
                     </div>
                 </div>
-                {condensedContent.metadata.tags && condensedContent.metadata.tags.length > 0 && (
-                    <div className="mt-3 pt-3 border-t border-blue-200/50">
-                        <h4 className="text-xs font-semibold text-gray-500 mb-2">Topics</h4>
-                        <div className="flex flex-wrap gap-1.5">
-                            {condensedContent.metadata.tags.slice(0, 5).map((tag, idx) => (
-                                <span
-                                    key={idx}
-                                    title={tag}
-                                    className="text-xs bg-blue-100 text-blue-800 px-2.5 py-1 rounded-full truncate hover:bg-blue-200 transition-colors"
-                                    style={{ maxWidth: 'var(--tag-max-width, 150px)' }}
-                                >
-                                    {tag}
-                                </span>
-                            ))}
-                        </div>
-                    </div>
-                )}
             </div>
         </div>
     );

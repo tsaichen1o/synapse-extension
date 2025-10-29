@@ -3,8 +3,7 @@ import toast from 'react-hot-toast';
 import { db } from "../lib/db";
 import { AI, isAIAvailable } from "../lib/ai";
 import { getPageContent } from "../lib/helper";
-import { PageContent, StructuredData, CondensedPageContent } from "../lib/types";
-import { ChatMessage, LoadingPhase } from "./types";
+import { ChatMessage, LoadingPhase, PageContent, StructuredData, CondensedPageContent } from "../lib/types";
 import { WelcomeScreen } from "./components/WelcomeScreen";
 import { Header } from "./components/Header";
 import { URLDisplay } from "./components/URLDisplay";
@@ -29,13 +28,10 @@ function App(): React.JSX.Element {
     const [currentPageUrl, setCurrentPageUrl] = useState<string>("");
     const [currentPageContent, setCurrentPageContent] = useState<PageContent | null>(null);
     const [condensedContent, setCondensedContent] = useState<CondensedPageContent | null>(null);
-    // original captured summary (before user-AI interactions)
     const [initialSummary, setInitialSummary] = useState<string>("");
-    // the latest summary that updates after each AI interaction
     const [currentSummary, setCurrentSummary] = useState<string>("");
-    // whether the user has sent at least one chat message (used to hide the original summary)
     const [hasUserInteracted, setHasUserInteracted] = useState<boolean>(false);
-    const [structuredData, setStructuredData] = useState<StructuredData>({}); // 用於 Key-Value Pairs
+    const [structuredData, setStructuredData] = useState<StructuredData>({});
     const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
     const [chatInput, setChatInput] = useState<string>("");
     const chatContainerRef = useRef<HTMLDivElement>(null);
@@ -44,7 +40,7 @@ function App(): React.JSX.Element {
     const [justUpdated, setJustUpdated] = useState<'summary' | 'structured' | 'both' | null>(null);
     const [saveCooldown, setSaveCooldown] = useState<number | null>(null);
 
-    const aiInstanceRef = useRef<AI | null>(null);
+    const aiRef = useRef<AI | null>(null);
 
     // Auto-scroll to bottom when new messages are added
     useEffect(() => {
@@ -74,8 +70,8 @@ function App(): React.JSX.Element {
         }
     }, [justUpdated]);
 
+    // Handle tab change events to update the current URL, but only when idle.
     useEffect(() => {
-        // Handle tab change events to update the current URL, but only when idle.
         const updateCurrentUrl = () => {
             if (loadingPhase === null && !initialSummary) {
                 chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
@@ -113,10 +109,10 @@ function App(): React.JSX.Element {
     // Cleanup AI instance on unmount
     useEffect(() => {
         return () => {
-            if (aiInstanceRef.current) {
+            if (aiRef.current) {
                 console.log("Destroying AI instance on unmount");
-                aiInstanceRef.current.destroy();
-                aiInstanceRef.current = null;
+                aiRef.current.destroy();
+                aiRef.current = null;
             }
         };
     }, []);
@@ -128,25 +124,20 @@ function App(): React.JSX.Element {
         try {
             const available = await isAIAvailable();
             if (!available) {
-                console.warn("AI is not available on this device");
                 toast.error("AI is not available on this device. Please check if Chrome Built-in AI is enabled.");
                 setIsInitializing(false);
                 return;
             }
 
-            console.log("Creating AI instance (triggered by user)...");
-            const ai = await AI.create({
+            aiRef.current = await AI.create({
                 temperature: 0.8,
                 topK: 50,
                 systemPrompt: 'You are a helpful assistant that analyzes web content, creates summaries, and refines structured data based on user feedback.'
             });
-            aiInstanceRef.current = ai;
-            console.log("AI instance ready");
             setIsAiInitialized(true);
             setIsInitializing(false);
             toast.success("AI initialized successfully!");
         } catch (error) {
-            console.error("Failed to initialize AI:", error);
             const errorMessage = error instanceof Error ? error.message : String(error);
             toast.error(`Failed to initialize AI: ${errorMessage}`);
             setIsInitializing(false);
@@ -154,7 +145,7 @@ function App(): React.JSX.Element {
     };
 
     const handleCapturePage = async (): Promise<void> => {
-        if (!aiInstanceRef.current) {
+        if (!aiRef.current) {
             toast.error("AI is not ready. Please wait or refresh the page.");
             return;
         }
@@ -169,50 +160,38 @@ function App(): React.JSX.Element {
         setSummarizeProgress(null);
 
         try {
-            console.log("📄 Capturing page content...");
             const pageContent = await getPageContent();
             setCurrentPageContent(pageContent);
 
             setLoadingPhase("condensing");
-            console.log("🔄 Condensing content...");
 
-            // Set up progress callback for condense operation
-            aiInstanceRef.current.setCondenseProgressCallback((current: number, total: number) => {
-                console.log(`Condense progress: ${current}/${total}`);
+            aiRef.current.setCondenseProgressCallback((current: number, total: number) => {
                 setCondenseProgress({ current, total });
             });
-
-            const condensed = await aiInstanceRef.current.condense(pageContent);
+            const condensed = await aiRef.current.condense(pageContent);
             setCondensedContent(condensed);
-            setCondenseProgress(null); // Clear progress after completion
+            setCondenseProgress(null);
 
-            await aiInstanceRef.current.reset();
-
-            console.log("🖼️  Appending image context to AI session...");
-            await aiInstanceRef.current.appendImageContext(pageContent);
+            await aiRef.current.reset();
+            await aiRef.current.appendImageContext(pageContent);
 
             setLoadingPhase("summarizing");
-            console.log("📝 Generating summary from condensed content...");
-
-            // Set up progress callback for summarize operation
-            aiInstanceRef.current.setSummarizeProgressCallback((current: number, total: number) => {
-                console.log(`Summarize progress: ${current}/${total}`);
+            aiRef.current.setSummarizeProgressCallback((current: number, total: number) => {
                 setSummarizeProgress({ current, total });
             });
-
-            const result = await aiInstanceRef.current.summarize(condensed);
-            setSummarizeProgress(null); // Clear progress after completion
-
+            const result = await aiRef.current.summarize(condensed);
             setInitialSummary(result.summary);
             setCurrentSummary(result.summary);
-            setHasUserInteracted(false);
             setStructuredData(result.structuredData);
+            setSummarizeProgress(null);
+
+            setHasUserInteracted(false);
             setChatMessages([
                 {
-                    sender: "ai",
+                    sender: "system",
                     text: `I have captured and summarized the page content. Here is the generated structured information:`,
                 },
-                { sender: "ai", text: `Summary: "${result.summary}"` },
+                { sender: "assistant", text: `Summary: "${result.summary}"` },
             ]);
             setLoadingPhase(null);
         } catch (error) {
@@ -227,7 +206,7 @@ function App(): React.JSX.Element {
         e.preventDefault();
         if (!chatInput.trim()) return;
 
-        if (!aiInstanceRef.current || !condensedContent) {
+        if (!aiRef.current || !condensedContent) {
             toast.error("AI is not ready or no page content captured. Please capture a page first.");
             return;
         }
@@ -240,7 +219,7 @@ function App(): React.JSX.Element {
 
         try {
             console.log("💬 Sending chat with condensed content...");
-            const aiResponse = await aiInstanceRef.current.chat(
+            const aiResponse = await aiRef.current.chat(
                 condensedContent,
                 currentSummary,
                 structuredData,
@@ -264,7 +243,7 @@ function App(): React.JSX.Element {
             setStructuredData(aiResponse.structuredData);
 
             const aiResponseMessage: ChatMessage = {
-                sender: "ai",
+                sender: "assistant",
                 text: aiResponse.aiResponse,
             };
 
@@ -283,8 +262,8 @@ function App(): React.JSX.Element {
         console.log("Discarding current session...");
 
         // Reset AI instance state
-        if (aiInstanceRef.current) {
-            aiInstanceRef.current.reset();
+        if (aiRef.current) {
+            aiRef.current.reset();
             console.log("AI instance has been reset.");
         }
 
@@ -378,7 +357,7 @@ function App(): React.JSX.Element {
                 contentType: condensedContent?.metadata.contentType,
                 tags: condensedContent?.metadata.tags, // Changed from mainTopics to tags
                 description: condensedContent?.metadata.description,
-                compressionRatio: condensedContent?.compressionRatio,
+                compressionRatio: condensedContent?.compressionRate,
                 originalLength: condensedContent?.originalLength,
                 condensedLength: condensedContent?.condensedLength,
                 createdAt: existingNode ? existingNode.createdAt : new Date(),

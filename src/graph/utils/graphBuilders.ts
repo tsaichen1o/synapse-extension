@@ -1,4 +1,4 @@
-import { SynapseLink, SynapseNode } from '../../lib/db';
+import type { SynapseLink, SynapseNode } from '../../lib/types';
 import { extractKeywords } from '../../lib/graph-utils';
 import {
     GraphBuildResult,

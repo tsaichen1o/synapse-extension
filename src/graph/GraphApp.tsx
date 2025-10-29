@@ -15,7 +15,8 @@ import ReactFlow, {
 import 'reactflow/dist/style.css'; // ReactFlow base styles
 import * as d3 from 'd3'; // Import D3
 
-import { db, SynapseNode } from '../lib/db'; // Import our database
+import { db } from '../lib/db'; // Import our database
+import type { SynapseNode } from '../lib/types';
 import NodeDetailPanel from './NodeDetailPanel'; // Node detail panel component
 
 // Define the custom data type for our nodes

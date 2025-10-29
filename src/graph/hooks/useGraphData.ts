@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { db, SynapseLink, SynapseNode } from '../../lib/db';
+import { db } from '../../lib/db';
+import type { SynapseLink, SynapseNode } from '../../lib/types';
 
 const buildMockData = (): { nodes: SynapseNode[]; links: SynapseLink[] } => {
     const mockNodes: SynapseNode[] = [

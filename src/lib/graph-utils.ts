@@ -1,5 +1,6 @@
 // src/lib/graph-utils.ts
-import { db, SynapseNode } from './db';
+import { db } from './db';
+import type { SynapseNode } from './types';
 
 const SIMILARITY_THRESHOLD = 0.2; // Lowered threshold for more connections
 
