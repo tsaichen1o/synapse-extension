@@ -23,6 +23,30 @@ export function StructuredDataDisplay({ data, isFlashing = false }: StructuredDa
     const visibleEntries = useMemo(() => entries.slice(0, MAX_TAGS), [entries]);
     const hiddenCount = entries.length > MAX_TAGS ? entries.length - MAX_TAGS : 0;
 
+    const formatValue = (value: unknown): string => {
+        if (value == null) return '—';
+        if (value instanceof Date) return value.toLocaleString();
+        if (typeof value === 'string') return value;
+        if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+        if (Array.isArray(value)) {
+            return value.map(item => formatValue(item)).join(', ');
+        }
+
+        try {
+            return JSON.stringify(value, null, 2);
+        } catch (error) {
+            console.warn('Failed to stringify structured value', error);
+            return String(value);
+        }
+    };
+
+    const toModalValue = (value: unknown): string | string[] => {
+        if (Array.isArray(value)) {
+            return value.map(item => formatValue(item));
+        }
+        return formatValue(value);
+    };
+
     const truncateText = (text: string, maxLength: number = DEFAULT_MAX_TEXT_LENGTH): string => {
         if (text.length <= maxLength) return text;
         return text.substring(0, maxLength) + '...';
@@ -40,11 +64,15 @@ export function StructuredDataDisplay({ data, isFlashing = false }: StructuredDa
         return (
             <div className="flex flex-wrap gap-x-2 gap-y-3">
                 {visibleEntries.map(([key, value]) => {
-                    const modalValue = Array.isArray(value) ? value : String(value);
-                    const displayText = Array.isArray(value)
-                        ? `${value.length} item${value.length > 1 ? 's' : ''}`
-                        : String(value);
-                    const tagLabel = truncateText(displayText, TAG_MAX_LENGTH);
+                    const modalValue = toModalValue(value);
+                    const displaySource = Array.isArray(modalValue)
+                        ? modalValue.length === 0
+                            ? 'No items'
+                            : modalValue.length === 1
+                                ? modalValue[0]
+                                : `${modalValue.length} items`
+                        : modalValue;
+                    const tagLabel = truncateText(displaySource.replace(/\s+/g, ' '), TAG_MAX_LENGTH);
 
                     return (
                         <button
@@ -70,13 +98,13 @@ export function StructuredDataDisplay({ data, isFlashing = false }: StructuredDa
                         onClick={() => {
                             const remaining = entries.slice(MAX_TAGS);
                             const aggregatedValues = remaining.map(([entryKey, entryValue]) => {
-                                const text = Array.isArray(entryValue) ? entryValue.join(', ') : String(entryValue);
+                                const text = Array.isArray(entryValue)
+                                    ? entryValue.map(item => formatValue(item)).join(', ')
+                                    : formatValue(entryValue);
                                 return `${entryKey}: ${text}`;
                             });
-                            handleBubbleClick(
-                                `+${hiddenCount} more`,
-                                aggregatedValues.length > 0 ? aggregatedValues : 'No additional data',
-                            );
+                            const modalValue = aggregatedValues.length > 0 ? aggregatedValues : ['No additional data'];
+                            handleBubbleClick(`+${hiddenCount} more`, modalValue);
                         }}
                     >
                         +{hiddenCount} more
@@ -108,7 +136,7 @@ export function StructuredDataDisplay({ data, isFlashing = false }: StructuredDa
                         onClick={(e) => e.stopPropagation()}
                     >
                         {/* Modal header */}
-                        <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-purple-50 to-pink-50">
+                        <div className="flex items-center justify-between px-6 py-3 border-b border-gray-200 bg-gradient-to-r from-purple-50 to-pink-50">
                             <div className="flex items-center gap-3">
                                 <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
@@ -136,7 +164,9 @@ export function StructuredDataDisplay({ data, isFlashing = false }: StructuredDa
                                             className="p-3 bg-purple-50/50 rounded-lg border border-purple-100 text-gray-700"
                                         >
                                             <span className="text-purple-600 font-medium mr-2">{index + 1}.</span>
-                                            {item}
+                                            <pre className="inline whitespace-pre-wrap break-words font-mono text-xs text-gray-700">
+                                                {item}
+                                            </pre>
                                         </div>
                                     ))}
                                 </div>
@@ -145,16 +175,6 @@ export function StructuredDataDisplay({ data, isFlashing = false }: StructuredDa
                                     {modalData.value}
                                 </div>
                             )}
-                        </div>
-
-                        {/* Modal footer */}
-                        <div className="flex justify-end p-4 border-t border-gray-200 bg-gray-50">
-                            <button
-                                onClick={closeModal}
-                                className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium"
-                            >
-                                Close
-                            </button>
                         </div>
                     </div>
                 </div>
