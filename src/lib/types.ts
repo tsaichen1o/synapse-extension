@@ -12,7 +12,7 @@
  */
 export interface SynapseNode {
     id?: number;
-    type: string;
+    type: ContentType;
     url: string;
     title: string;
     createdAt: Date;
@@ -47,7 +47,7 @@ export interface ChatMessage {
 /**
  * Loading phase indicators for UI feedback
  */
-export type LoadingPhase = "capturing" | "condensing" | "summarizing" | "chatting" | "saving" | null;
+export type LoadingPhase = "idle" | "capturing" | "condensing" | "summarizing" | "chatting" | "saving";
 
 // ===== Content Extraction Types =====
 

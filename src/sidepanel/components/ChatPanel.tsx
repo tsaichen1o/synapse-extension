@@ -1,5 +1,5 @@
 import React from "react";
-import { ChatMessage, LoadingPhase } from "../types";
+import { ChatMessage, LoadingPhase } from "../../lib/types";
 
 interface ChatPanelProps {
     messages: ChatMessage[];

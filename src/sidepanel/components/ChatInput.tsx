@@ -1,5 +1,5 @@
 import React from "react";
-import { LoadingPhase } from "../types";
+import { LoadingPhase } from "../../lib/types";
 
 interface ChatInputProps {
     chatInput: string;

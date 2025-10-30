@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { LoadingPhase } from "../types";
+import { LoadingPhase } from "../../lib/types";
 
 interface CaptureButtonProps {
     loadingPhase: LoadingPhase;
@@ -35,7 +35,7 @@ export function CaptureButton({ loadingPhase, hasInitialSummary, onCapture, cond
     const progressRef = useRef(0);
     const animationFrameRef = useRef<number | null>(null);
     const resetTimeoutRef = useRef<number | null>(null);
-    const activePhaseRef = useRef<LoadingPhase>(null);
+    const activePhaseRef = useRef<LoadingPhase>("idle");
 
     const cancelAnimation = useCallback(() => {
         if (animationFrameRef.current !== null) {
@@ -128,7 +128,7 @@ export function CaptureButton({ loadingPhase, hasInitialSummary, onCapture, cond
                     setProgress(0);
                     resetTimeoutRef.current = null;
                 }, 650);
-            } else if (loadingPhase === null || loadingPhase === 'capturing') {
+            } else if (loadingPhase === "idle" || loadingPhase === 'capturing') {
                 cancelAnimation();
                 if (resetTimeoutRef.current !== null) {
                     window.clearTimeout(resetTimeoutRef.current);
@@ -170,7 +170,7 @@ export function CaptureButton({ loadingPhase, hasInitialSummary, onCapture, cond
         if (loadingPhase === 'condensing' || loadingPhase === 'summarizing') {
             return "bg-purple-950/60 backdrop-blur-sm text-white";
         }
-        if (loadingPhase !== null || hasInitialSummary) {
+        if (loadingPhase !== "idle" || hasInitialSummary) {
             return "bg-gradient-to-r from-gray-400 to-gray-500 text-white shadow-none";
         }
         return "bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white hover:shadow-xl hover:scale-[1.02] active:scale-[0.98]";
@@ -180,7 +180,7 @@ export function CaptureButton({ loadingPhase, hasInitialSummary, onCapture, cond
         <div className="mb-8">
             <button
                 onClick={onCapture}
-                disabled={loadingPhase !== null || hasInitialSummary}
+                disabled={loadingPhase !== "idle" || hasInitialSummary}
                 className={`${buttonBaseClasses} ${getButtonStateClasses()}`}
             >
                 {loadingPhase === "capturing" ? (

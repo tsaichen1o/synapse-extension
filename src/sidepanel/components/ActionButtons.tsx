@@ -1,23 +1,23 @@
 import React from "react";
-import { LoadingPhase } from "../types";
+import { LoadingPhase } from "../../lib/types";
 
 interface ActionButtonsProps {
     loadingPhase: LoadingPhase;
     onDiscard: () => void;
     onSave: () => void;
-    saveCooldown: number | null;
+    saveCooldown: number;
     onCancelAutoClear: () => void;
 }
 
 export function ActionButtons({ loadingPhase, onDiscard, onSave, saveCooldown, onCancelAutoClear }: ActionButtonsProps): React.JSX.Element {
     const isSaving = loadingPhase === "saving";
-    const isCooldown = saveCooldown !== null;
+    const isCooldown = saveCooldown > 0;
 
     return (
         <div className="mb-6 grid grid-cols-2 gap-3">
             <button
                 onClick={onDiscard}
-                disabled={loadingPhase !== null}
+                disabled={loadingPhase !== "idle"}
                 className="w-full bg-red-100/60 backdrop-blur-md hover:bg-red-200/80 disabled:bg-gray-300/60 border border-red-200 text-red-700 font-semibold py-3 px-6 rounded-2xl transition-all duration-300 shadow-lg hover:shadow-xl disabled:shadow-none transform hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2"
             >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -27,7 +27,7 @@ export function ActionButtons({ loadingPhase, onDiscard, onSave, saveCooldown, o
             </button>
             <button
                 onClick={onSave}
-                disabled={loadingPhase !== null || isCooldown}
+                disabled={loadingPhase !== "idle" || isCooldown}
                 className="w-full bg-white/60 backdrop-blur-md hover:bg-white/80 disabled:bg-gray-300/60 border border-purple-200 text-purple-700 font-semibold py-3 px-6 rounded-2xl transition-all duration-300 shadow-lg hover:shadow-xl disabled:shadow-none transform hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2"
             >
                 {isSaving ? (
