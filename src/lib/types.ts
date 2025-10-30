@@ -365,3 +365,58 @@ export interface AILanguageModel {
      */
     create(options?: AILanguageModelCreateOptions): Promise<AILanguageModelSession>;
 }
+
+// --- Chrome Built-in AI Additional APIs ---
+
+export type LanguageDetectorAvailability = AIModelAvailability;
+
+export interface LanguageDetectionResult {
+    detectedLanguage: string;
+    confidence: number;
+}
+
+export interface LanguageDetectorCreateOptions {
+    monitor?: (monitor: EventTarget) => void;
+    signal?: AbortSignal;
+}
+
+export interface LanguageDetectorSession {
+    detect(text: string): Promise<LanguageDetectionResult[]>;
+    destroy?: () => void;
+}
+
+export interface LanguageDetector {
+    availability(): Promise<LanguageDetectorAvailability>;
+    create(options?: LanguageDetectorCreateOptions): Promise<LanguageDetectorSession>;
+}
+
+export interface LanguageDetectionRequestOptions extends LanguageDetectorCreateOptions {
+    forceReload?: boolean;
+}
+
+export type TranslatorAvailability = AIModelAvailability;
+
+export interface TranslatorAvailabilityOptions {
+    sourceLanguage: string;
+    targetLanguage: string;
+}
+
+export interface TranslatorCreateOptions extends TranslatorAvailabilityOptions {
+    monitor?: (monitor: EventTarget) => void;
+    signal?: AbortSignal;
+}
+
+export interface TranslatorSession {
+    translate(text: string): Promise<string>;
+    translateStreaming(text: string): Promise<ReadableStream<string>> | ReadableStream<string>;
+    destroy?: () => void;
+}
+
+export interface Translator {
+    availability(options: TranslatorAvailabilityOptions): Promise<TranslatorAvailability>;
+    create(options: TranslatorCreateOptions): Promise<TranslatorSession>;
+}
+
+export interface TranslationRequestOptions extends TranslatorCreateOptions {
+    forceReload?: boolean;
+}

@@ -9,7 +9,7 @@
  * @see https://developer.chrome.com/docs/ai/built-in
  */
 
-import type { AILanguageModel } from './types';
+import type { AILanguageModel, LanguageDetector, Translator } from './types';
 
 declare global {
     interface Window {
@@ -18,6 +18,16 @@ declare global {
          * Available in Chrome 138+ with appropriate flags/origin trial
          */
         LanguageModel?: AILanguageModel;
+
+        /**
+         * Chrome Built-in AI Language Detector API
+         */
+        LanguageDetector?: LanguageDetector;
+
+        /**
+         * Chrome Built-in On-Device Translator API
+         */
+        Translator?: Translator;
 
         /**
          * Development utility: Clear all data from Synapse IndexedDB

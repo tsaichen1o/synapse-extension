@@ -6,8 +6,18 @@ import type {
     SummaryResponse,
     ChatResponse,
     CondensedPageContent,
+    LanguageDetectionRequestOptions,
+    LanguageDetectionResult,
+    TranslationRequestOptions,
 } from '../types';
-import { SummarizeService, ChatService, CondenseService, ImageService } from './services';
+import {
+    SummarizeService,
+    ChatService,
+    CondenseService,
+    ImageService,
+    LanguageDetectorService,
+    TranslatorService
+} from './services';
 
 /**
  * Wrapper class for Chrome Built-in AI (currently Gemini Nano)
@@ -19,6 +29,8 @@ export class AI {
     private readonly chatService: ChatService;
     private readonly condenseService: CondenseService;
     private readonly imageService: ImageService;
+    private readonly languageDetectorService: LanguageDetectorService;
+    private readonly translatorService: TranslatorService;
 
 
     private constructor(session: AILanguageModelSession) {
@@ -28,6 +40,8 @@ export class AI {
         this.chatService = new ChatService(this);
         this.condenseService = new CondenseService(this);
         this.imageService = new ImageService(this);
+        this.languageDetectorService = new LanguageDetectorService();
+        this.translatorService = new TranslatorService();
     }
 
     /**
@@ -172,6 +186,8 @@ export class AI {
      */
     destroy(): void {
         this.nativeSession.destroy();
+        this.languageDetectorService.reset();
+        this.translatorService.reset();
     }
 
     /**
@@ -238,5 +254,33 @@ export class AI {
         userMessage: string
     ): Promise<ChatResponse> {
         return this.chatService.chat(input, currentSummary, currentStructuredData, userMessage);
+    }
+
+    /**
+     * Detect likely languages for a piece of text using the on-device language detector.
+     */
+    async detectLanguage(
+        text: string,
+        options?: LanguageDetectionRequestOptions
+    ): Promise<LanguageDetectionResult[]> {
+        return this.languageDetectorService.detect(text, options);
+    }
+
+    /**
+     * Translate text using the on-device translator for the given language pair.
+     */
+    async translate(text: string, options: TranslationRequestOptions): Promise<string> {
+        return this.translatorService.translate(text, options);
+    }
+
+    /**
+     * Translate text using streaming output, forwarding chunks to the provided callback.
+     */
+    async translateStreaming(
+        text: string,
+        options: TranslationRequestOptions,
+        onChunk?: (chunk: string) => void
+    ): Promise<string> {
+        return this.translatorService.translateStreaming(text, options, onChunk);
     }
 }

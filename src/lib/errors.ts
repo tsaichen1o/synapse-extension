@@ -3,7 +3,7 @@
  * Provides rich context for error handling and user feedback
  */
 
-export type AIProcessingPhase = 'condense' | 'summarize' | 'chat' | 'image';
+export type AIProcessingPhase = 'condense' | 'summarize' | 'chat' | 'image' | 'detect' | 'translate';
 export type AIProcessingStep =
     | 'metadata-extraction'
     | 'chunking'
@@ -15,7 +15,9 @@ export type AIProcessingStep =
     | 'intent-analysis'
     | 'modification'
     | 'response-generation'
-    | 'image-processing';
+    | 'image-processing'
+    | 'language-detection'
+    | 'translation';
 
 /**
  * Base error class for AI processing errors
@@ -122,6 +124,38 @@ export class ChatError extends AIProcessingError {
 }
 
 /**
+ * Error for language detection failures
+ */
+export class LanguageDetectionError extends AIProcessingError {
+    constructor(
+        step: AIProcessingStep,
+        message: string,
+        recoverable: boolean,
+        userMessage: string,
+        originalError?: Error
+    ) {
+        super(message, 'detect', step, recoverable, userMessage, originalError);
+        this.name = 'LanguageDetectionError';
+    }
+}
+
+/**
+ * Error for translation failures
+ */
+export class TranslationError extends AIProcessingError {
+    constructor(
+        step: AIProcessingStep,
+        message: string,
+        recoverable: boolean,
+        userMessage: string,
+        originalError?: Error
+    ) {
+        super(message, 'translate', step, recoverable, userMessage, originalError);
+        this.name = 'TranslationError';
+    }
+}
+
+/**
  * Error for quota/rate limit issues
  */
 export class AIQuotaError extends AIProcessingError {
@@ -155,6 +189,63 @@ export const AIErrors = {
             `Content too large: ${contentLength} characters`,
             true,
             'The page content is very large. Trying to compress it...',
+        );
+    },
+
+    /**
+     * Language detector not available
+     */
+    languageDetectorNotAvailable: (): LanguageDetectionError => {
+        return new LanguageDetectionError(
+            'language-detection',
+            'LanguageDetector API is not available on this device',
+            false,
+            'Language detection is not supported on this device. Please update Chrome or enable the relevant feature flags.'
+        );
+    },
+
+    /**
+     * Language detection failed
+     */
+    languageDetectionFailed: (originalError: Error): LanguageDetectionError => {
+        return new LanguageDetectionError(
+            'language-detection',
+            'Failed to detect language',
+            true,
+            'Unable to detect the language right now. Please try again in a moment.',
+            originalError
+        );
+    },
+
+    /**
+     * Translator not available
+     */
+    translatorNotAvailable: (sourceLanguage?: string, targetLanguage?: string): TranslationError => {
+        const pair = sourceLanguage && targetLanguage
+            ? `${sourceLanguage} → ${targetLanguage}`
+            : undefined;
+        return new TranslationError(
+            'translation',
+            pair
+                ? `Translator API does not support ${pair}`
+                : 'Translator API is not available on this device',
+            false,
+            pair
+                ? `On-device translation for ${pair} is not available. Please choose a different language pair.`
+                : 'On-device translation is not supported on this device. Please update Chrome or enable the relevant feature flags.'
+        );
+    },
+
+    /**
+     * Translation failed
+     */
+    translationFailed: (originalError: Error): TranslationError => {
+        return new TranslationError(
+            'translation',
+            'Failed to translate text',
+            true,
+            'Unable to translate the text right now. Please try again in a moment.',
+            originalError
         );
     },
 
@@ -275,7 +366,7 @@ export const AIErrors = {
         return new AIProcessingError(
             `Unexpected error in ${phase}`,
             phase,
-            'metadata-extraction',
+            phase === 'detect' ? 'language-detection' : phase === 'translate' ? 'translation' : 'metadata-extraction',
             false,
             `An unexpected error occurred. Please try again. (${originalError.message})`,
             originalError

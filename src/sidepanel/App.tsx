@@ -148,19 +148,79 @@ function App(): React.JSX.Element {
 
         try {
             const pageContent = await getPageContent();
-            setCurrentPageContent(pageContent);
+            let processedPageContent = pageContent;
+
+            if (aiRef.current) {
+                try {
+                    const detectionSource = (pageContent.fullText || pageContent.mainContent || '').trim();
+                    if (detectionSource) {
+                        const languageResults = await aiRef.current.detectLanguage(detectionSource.slice(0, 8000));
+                        const [topResult] = languageResults;
+
+                        const detectedCode = topResult?.detectedLanguage?.toLowerCase();
+                        const isEnglish = detectedCode ? detectedCode === 'en' || detectedCode.startsWith('en-') : false;
+
+                        if (topResult && detectedCode && !isEnglish && topResult.confidence >= 0.3) {
+                            const translationOptions = {
+                                sourceLanguage: topResult.detectedLanguage,
+                                targetLanguage: 'en' as const,
+                            };
+
+                            const loadingId = toast.loading(`Detected ${topResult.detectedLanguage}. Translating content to English...`);
+
+                            try {
+                                const translateText = async (text?: string) => {
+                                    if (!text?.trim()) return text;
+                                    return await aiRef.current!.translateStreaming(text, translationOptions);
+                                };
+
+                                const [translatedAbstract, translatedMainContent, translatedFullText] = await Promise.all([
+                                    translateText(pageContent.abstract),
+                                    translateText(pageContent.mainContent),
+                                    translateText(pageContent.fullText),
+                                ]);
+
+                                processedPageContent = {
+                                    ...pageContent,
+                                    abstract: translatedAbstract ?? pageContent.abstract,
+                                    mainContent: translatedMainContent ?? pageContent.mainContent,
+                                    fullText: translatedFullText ?? pageContent.fullText,
+                                    metadata: {
+                                        ...pageContent.metadata,
+                                        extra: {
+                                            ...pageContent.metadata.extra,
+                                            originalLanguage: topResult.detectedLanguage,
+                                            languageDetectionConfidence: topResult.confidence,
+                                        },
+                                    },
+                                };
+
+                                toast.success('Page content translated to English.', { id: loadingId });
+                            } catch (translationError) {
+                                console.error('Translation failed, using original content.', translationError);
+                                toast.error('Failed to translate content. Continuing with original language.', { id: loadingId });
+                                processedPageContent = pageContent;
+                            }
+                        }
+                    }
+                } catch (detectionError) {
+                    console.warn('Language detection failed. Proceeding without translation.', detectionError);
+                }
+            }
+
+            setCurrentPageContent(processedPageContent);
 
             setLoadingPhase("condensing");
 
             aiRef.current.setCondenseProgressCallback((current: number, total: number) => {
                 setCondenseProgress({ current, total });
             });
-            const condensed = await aiRef.current.condense(pageContent);
+            const condensed = await aiRef.current.condense(processedPageContent);
             setCondensedContent(condensed);
             setCondenseProgress(null);
 
             await aiRef.current.reset();
-            await aiRef.current.appendImageContext(pageContent);
+            await aiRef.current.appendImageContext(processedPageContent);
 
             setLoadingPhase("summarizing");
             aiRef.current.setSummarizeProgressCallback((current: number, total: number) => {
