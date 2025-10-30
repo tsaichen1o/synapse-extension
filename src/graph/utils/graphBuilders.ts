@@ -214,7 +214,6 @@ const buildClusterViewGraph = (notes: SynapseNode[]): GraphBuildResult => {
 
         const topKeywords = Array.from(keywordCount.entries())
             .sort((a, b) => b[1] - a[1])
-            .slice(0, 4)
             .map(([word]) => word);
 
         clusters.push({ notes: clusterNotes, keywords: topKeywords });

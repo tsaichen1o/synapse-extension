@@ -33,7 +33,7 @@ if (import.meta.env?.DEV) {
         await db.links.clear();
 
         const node1 = await db.nodes.add({
-            type: 'paper',
+            type: 'research-paper',
             url: 'https://arxiv.org/abs/1706.03762',
             title: 'Attention Is All You Need',
             summary: 'The Transformer architecture revolutionized NLP by replacing recurrence with self-attention mechanisms, enabling parallel processing and better long-range dependencies.',
@@ -48,7 +48,7 @@ if (import.meta.env?.DEV) {
         });
 
         const node2 = await db.nodes.add({
-            type: 'paper',
+            type: 'research-paper',
             url: 'https://arxiv.org/abs/1810.04805',
             title: 'BERT: Pre-training of Deep Bidirectional Transformers',
             summary: 'BERT introduced bidirectional pre-training for language understanding, achieving state-of-the-art results on multiple NLP benchmarks through masked language modeling.',
@@ -63,7 +63,7 @@ if (import.meta.env?.DEV) {
         });
 
         const node3 = await db.nodes.add({
-            type: 'paper',
+            type: 'research-paper',
             url: 'https://arxiv.org/abs/2005.14165',
             title: 'GPT-3: Language Models are Few-Shot Learners',
             summary: 'GPT-3 demonstrated that scaling language models to 175B parameters enables few-shot learning without fine-tuning, showing emergent capabilities across diverse tasks.',
@@ -78,7 +78,7 @@ if (import.meta.env?.DEV) {
         });
 
         const node4 = await db.nodes.add({
-            type: 'paper',
+            type: 'research-paper',
             url: 'https://arxiv.org/abs/2203.02155',
             title: 'Chain-of-Thought Prompting',
             summary: 'Chain-of-thought prompting elicits reasoning in large language models by encouraging them to generate intermediate reasoning steps, dramatically improving performance on complex tasks.',
@@ -93,7 +93,7 @@ if (import.meta.env?.DEV) {
         });
 
         const node5 = await db.nodes.add({
-            type: 'paper',
+            type: 'research-paper',
             url: 'https://arxiv.org/abs/2307.09288',
             title: 'Llama 2: Open Foundation and Fine-Tuned Chat Models',
             summary: 'Llama 2 provides open-source foundation models ranging from 7B to 70B parameters, trained on 2 trillion tokens, with fine-tuned chat variants optimized for dialogue.',
