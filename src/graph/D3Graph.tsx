@@ -49,6 +49,7 @@ const D3Graph: React.FC = () => {
     const nodePositionsRef = useRef<Map<string, { x: number; y: number }>>(new Map());
     const { nodes, links, updateNode, refresh } = useGraphData();
     const [viewMode, setViewMode] = useState<GraphViewMode>('value');
+    const [showIsolatedValues, setShowIsolatedValues] = useState(false);
     const [selectedNode, setSelectedNode] = useState<SynapseNode | null>(null);
     const [infoPanel, setInfoPanel] = useState<InfoPanelData | null>(null);
     useEffect(() => {
@@ -57,7 +58,29 @@ const D3Graph: React.FC = () => {
         nodePositionsRef.current.clear();
     }, [viewMode]);
 
-    const graphData = useMemo(() => buildGraphData(viewMode, nodes, links), [viewMode, nodes, links]);
+    const rawGraphData = useMemo(() => buildGraphData(viewMode, nodes, links), [viewMode, nodes, links]);
+
+    const graphData = useMemo(() => {
+        if (viewMode !== 'value' || showIsolatedValues) {
+            return rawGraphData;
+        }
+
+        const hiddenIds = new Set<string>();
+        rawGraphData.nodes.forEach(node => {
+            if (node.type === 'value' && node.meta?.isIsolatedValue) {
+                hiddenIds.add(node.id);
+            }
+        });
+
+        if (hiddenIds.size === 0) {
+            return rawGraphData;
+        }
+
+        return {
+            nodes: rawGraphData.nodes.filter(node => !hiddenIds.has(node.id)),
+            links: rawGraphData.links.filter(link => !hiddenIds.has(link.sourceId) && !hiddenIds.has(link.targetId)),
+        };
+    }, [rawGraphData, showIsolatedValues, viewMode]);
 
     const nodeLinkCount = useMemo(() => {
         const counts = new Map<string, number>();
@@ -106,7 +129,7 @@ const D3Graph: React.FC = () => {
         if (graphNode.type === 'value' && graphNode.meta?.associations) {
             const lines = graphNode.meta.associations.map(assoc => `${assoc.key} ← ${assoc.noteTitle}`);
             setInfoPanel({
-                title: graphNode.label,
+                title: graphNode.meta?.valueSample ?? graphNode.label,
                 lines: lines.length > 0 ? lines : ['No linked notes yet.'],
             });
             setSelectedNode(null);
@@ -199,18 +222,31 @@ const D3Graph: React.FC = () => {
         <div className="w-full h-full relative">
             <canvas ref={canvasRef} className="w-full h-full" />
 
-            <div className="absolute top-4 right-4 flex bg-white/90 border border-purple-100 shadow-lg rounded-full overflow-hidden text-sm font-medium text-purple-700">
-                {VIEW_OPTIONS.map(option => (
+            <div className="absolute top-4 right-4 flex flex-col items-end gap-2">
+                <div className="flex bg-white/90 border border-purple-100 shadow-lg rounded-full overflow-hidden text-sm font-medium text-purple-700">
+                    {VIEW_OPTIONS.map(option => (
+                        <button
+                            key={option.value}
+                            onClick={() => setViewMode(option.value)}
+                            className={`px-4 py-2 transition-colors ${viewMode === option.value ? 'bg-purple-500 text-white' : 'hover:bg-purple-50'}`}
+                            title={option.hint}
+                        >
+                            {option.label}
+                        </button>
+                    ))}
+                </div>
+
+                {viewMode === 'value' && (
                     <button
-                        key={option.value}
-                        onClick={() => setViewMode(option.value)}
-                        className={`px-4 py-2 transition-colors ${viewMode === option.value ? 'bg-purple-500 text-white' : 'hover:bg-purple-50'
-                            }`}
-                        title={option.hint}
+                        type="button"
+                        onClick={() => setShowIsolatedValues(prev => !prev)}
+                        className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors border shadow bg-white/90 ${showIsolatedValues ? 'border-purple-200 text-purple-700 hover:bg-purple-50' : 'border-purple-400 text-purple-600 bg-purple-50'}`}
+                        title={showIsolatedValues ? 'Hide single-connection values' : 'Show single-connection values'}
+                        aria-pressed={!showIsolatedValues}
                     >
-                        {option.label}
+                        {showIsolatedValues ? 'Hide Single Values' : 'Show Single Values'}
                     </button>
-                ))}
+                )}
             </div>
 
             {infoPanel && (

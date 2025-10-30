@@ -9,6 +9,14 @@ import {
 
 const KEYWORD_SIMILARITY_THRESHOLD = 0.22;
 
+const truncateValueLabel = (value: string, maxLength = 32) => {
+    if (value.length <= maxLength) {
+        return value;
+    }
+    const safeLength = Math.max(0, maxLength - 3);
+    return `${value.slice(0, safeLength)}...`;
+};
+
 interface KeywordBucket {
     key: string;
     value: string;
@@ -62,7 +70,7 @@ const buildValueViewGraph = (notes: SynapseNode[]): GraphBuildResult => {
                 valueCounter += 1;
                 valueNode = {
                     id: `value:${valueCounter}`,
-                    label: value,
+                    label: truncateValueLabel(value),
                     type: 'value',
                     meta: {
                         key,
@@ -81,23 +89,29 @@ const buildValueViewGraph = (notes: SynapseNode[]): GraphBuildResult => {
         });
     });
 
-    // Second pass: only add value nodes that have 2+ associations and their links
+    // Second pass: add value nodes and mark singletons so the UI can fade them until hovered
     valueNodes.forEach(valueNode => {
-        const associationCount = valueNode.meta?.associations?.length ?? 0;
-        if (associationCount >= 2) {
-            nodes.push(valueNode);
+        const associations = valueNode.meta?.associations ?? [];
+        if (associations.length === 0) return;
 
-            // Add links for this value node
-            valueNode.meta?.associations?.forEach(assoc => {
-                links.push({
-                    id: `structured:${assoc.noteId}:${valueNode.id}:${assoc.key}`,
-                    sourceId: `note:${assoc.noteId}`,
-                    targetId: valueNode.id,
-                    label: assoc.key,
-                    meta: { key: assoc.key, value: valueNode.label, type: 'structured' },
-                });
-            });
+        if (associations.length === 1) {
+            valueNode.meta = {
+                ...valueNode.meta,
+                isIsolatedValue: true,
+            };
         }
+
+        nodes.push(valueNode);
+
+        associations.forEach(assoc => {
+            links.push({
+                id: `structured:${assoc.noteId}:${valueNode.id}:${assoc.key}`,
+                sourceId: `note:${assoc.noteId}`,
+                targetId: valueNode.id,
+                label: assoc.key,
+                meta: { key: assoc.key, value: valueNode.label, type: 'structured' },
+            });
+        });
     });
 
     return { nodes, links };

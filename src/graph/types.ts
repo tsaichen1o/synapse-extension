@@ -16,6 +16,7 @@ export interface GraphNodeMeta {
     keywords?: string[];
     key?: string;
     valueSample?: string;
+    isIsolatedValue?: boolean;
 }
 
 export interface GraphNodeData {

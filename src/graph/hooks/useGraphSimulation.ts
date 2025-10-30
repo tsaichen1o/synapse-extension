@@ -132,6 +132,8 @@ export const useGraphSimulation = ({
             })
             .filter((link): link is SimulationLink => link !== null);
 
+        let hoveredNode: SimulationNode | null = null;
+
         const clampNodePosition = (node: SimulationNode) => {
             const radius = getNodeRadius(node.data);
             const maxX = width - radius;
@@ -142,16 +144,35 @@ export const useGraphSimulation = ({
             node.y = Math.min(Math.max(safeY, radius), Math.max(radius, maxY));
         };
 
-        const simulation = d3
-            .forceSimulation(simNodes)
-            .force('link', d3.forceLink<SimulationNode, SimulationLink>(simLinks).id(node => node.id).distance(160))
-            .force('charge', d3.forceManyBody().strength(-450))
-            .force('center', d3.forceCenter(width / 2, height / 2))
-            .force('collision', d3.forceCollide<SimulationNode>(node => getNodeRadius(node.data) + 4))
-            .force('radial', d3.forceRadial<SimulationNode>(layoutRadius, centerX, centerY).strength(0.6))
-            .on('tick', ticked);
+        const drawNode = (node: SimulationNode, emphasize: boolean) => {
+            const radius = getNodeRadius(node.data);
+            const isIsolatedValue = node.data.type === 'value' && node.data.meta?.isIsolatedValue;
+            const fillAlpha = emphasize ? 1 : isIsolatedValue ? 0.36 : 1;
+            const labelAlpha = emphasize ? 1 : isIsolatedValue ? 0.7 : 1;
 
-        function drawLinkLabels() {
+            context.save();
+            context.globalAlpha = fillAlpha;
+            context.shadowColor = 'rgba(45, 55, 72, 0.18)';
+            context.shadowBlur = emphasize ? 18 : 12;
+            context.beginPath();
+            context.moveTo((node.x ?? 0) + radius, node.y ?? 0);
+            context.arc(node.x ?? 0, node.y ?? 0, radius, 0, Math.PI * 2);
+            context.fillStyle = getNodeFill(node.data);
+            context.fill();
+            context.strokeStyle = '#ffffff';
+            context.lineWidth = emphasize ? 2.6 : 2;
+            context.stroke();
+
+            context.shadowBlur = 0;
+            context.globalAlpha = labelAlpha;
+            context.fillStyle = emphasize || !isIsolatedValue ? '#1a202c' : 'rgba(26,32,44,0.68)';
+            context.font = '12px Inter, sans-serif';
+            context.textAlign = 'center';
+            context.fillText(node.data.label, node.x ?? 0, (node.y ?? 0) + radius + 14);
+            context.restore();
+        };
+
+        const drawLinkLabels = () => {
             context.save();
             context.font = '10px Inter, sans-serif';
             context.textAlign = 'center';
@@ -179,9 +200,9 @@ export const useGraphSimulation = ({
             });
 
             context.restore();
-        }
+        };
 
-        function ticked() {
+        const ticked = () => {
             simNodes.forEach(clampNodePosition);
             context.clearRect(0, 0, width, height);
 
@@ -202,26 +223,17 @@ export const useGraphSimulation = ({
 
             drawLinkLabels();
 
-            context.globalAlpha = 1;
+            const currentHoveredId = hoveredNode ? hoveredNode.id : null;
             simNodes.forEach(node => {
-                const radius = getNodeRadius(node.data);
-                context.shadowColor = 'rgba(45, 55, 72, 0.18)';
-                context.shadowBlur = 12;
-                context.beginPath();
-                context.moveTo((node.x ?? 0) + radius, node.y ?? 0);
-                context.arc(node.x ?? 0, node.y ?? 0, radius, 0, Math.PI * 2);
-                context.fillStyle = getNodeFill(node.data);
-                context.fill();
-                context.strokeStyle = '#ffffff';
-                context.lineWidth = 2;
-                context.stroke();
-                context.shadowBlur = 0;
-
-                context.fillStyle = '#1a202c';
-                context.font = '12px Inter, sans-serif';
-                context.textAlign = 'center';
-                context.fillText(node.data.label, node.x ?? 0, (node.y ?? 0) + radius + 14);
+                if (currentHoveredId && node.id === currentHoveredId) {
+                    return;
+                }
+                drawNode(node, false);
             });
+
+            if (hoveredNode) {
+                drawNode(hoveredNode, true);
+            }
 
             simNodes.forEach(node => {
                 storedPositions.set(node.id, {
@@ -229,7 +241,22 @@ export const useGraphSimulation = ({
                     y: node.y ?? 0,
                 });
             });
-        }
+        };
+
+        const simulation = d3
+            .forceSimulation(simNodes)
+            .force('link', d3.forceLink<SimulationNode, SimulationLink>(simLinks).id(node => node.id).distance(160))
+            .force('charge', d3.forceManyBody().strength(-450))
+            .force('center', d3.forceCenter(width / 2, height / 2))
+            .force('collision', d3.forceCollide<SimulationNode>(node => getNodeRadius(node.data) + 4))
+            .force('radial', d3.forceRadial<SimulationNode>(layoutRadius, centerX, centerY).strength(0.6))
+            .on('tick', ticked);
+
+        const updateHover = (node: SimulationNode | null) => {
+            if (hoveredNode?.id === node?.id) return;
+            hoveredNode = node;
+            ticked();
+        };
 
         const drag = d3
             .drag<HTMLCanvasElement, SimulationNode>()
@@ -259,12 +286,29 @@ export const useGraphSimulation = ({
             }
         };
 
+        const handlePointerMove = (evt: MouseEvent) => {
+            const node = simulation.find(evt.offsetX, evt.offsetY, 30);
+            if (node && node.data.type === 'value' && node.data.meta?.isIsolatedValue) {
+                updateHover(node);
+            } else {
+                updateHover(null);
+            }
+        };
+
+        const handlePointerLeave = () => {
+            updateHover(null);
+        };
+
         d3.select<HTMLCanvasElement, SimulationNode>(canvas).call(drag);
         d3.select(canvas).on('click', handleClick);
+        d3.select(canvas).on('mousemove', handlePointerMove);
+        d3.select(canvas).on('mouseleave', handlePointerLeave);
 
         return () => {
             simulation.stop();
             d3.select(canvas).on('click', null);
+            d3.select(canvas).on('mousemove', null);
+            d3.select(canvas).on('mouseleave', null);
             d3.select(canvas).on('.drag', null);
         };
     }, [
