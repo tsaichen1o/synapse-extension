@@ -6,7 +6,7 @@ const buildMockData = (): { nodes: SynapseNode[]; links: SynapseLink[] } => {
     const mockNodes: SynapseNode[] = [
         {
             id: 1,
-            type: 'paper',
+            type: 'research-paper',
             url: 'https://example.com/llm-review',
             title: 'LLM Review',
             summary: 'A review of Large Language Models.',
@@ -20,7 +20,7 @@ const buildMockData = (): { nodes: SynapseNode[]; links: SynapseLink[] } => {
         },
         {
             id: 2,
-            type: 'concept',
+            type: 'research-paper',
             url: '',
             title: 'Transformer',
             summary: 'The core architecture of modern LLMs.',
@@ -34,7 +34,7 @@ const buildMockData = (): { nodes: SynapseNode[]; links: SynapseLink[] } => {
         },
         {
             id: 3,
-            type: 'paper',
+            type: 'research-paper',
             url: 'https://example.com/attention',
             title: 'Attention Is All You Need',
             summary: 'The original paper introducing the Transformer.',
@@ -48,7 +48,7 @@ const buildMockData = (): { nodes: SynapseNode[]; links: SynapseLink[] } => {
         },
         {
             id: 4,
-            type: 'tool',
+            type: 'research-paper',
             url: 'https://tensorflow.org',
             title: 'TensorFlow',
             summary: 'An open-source machine learning framework.',
@@ -61,7 +61,7 @@ const buildMockData = (): { nodes: SynapseNode[]; links: SynapseLink[] } => {
         },
         {
             id: 5,
-            type: 'concept',
+            type: 'research-paper',
             url: '',
             title: 'Deep Learning',
             summary: 'A subfield of machine learning.',
