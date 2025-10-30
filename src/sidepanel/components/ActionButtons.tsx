@@ -67,7 +67,7 @@ export function ActionButtons({ loadingPhase, onDiscard, onSave, saveCooldown, o
                         onClick={onCancelAutoClear}
                         className="text-xs font-semibold text-purple-600 hover:text-purple-800 underline decoration-dotted"
                     >
-                        Keep current session
+                        Cancel
                     </button>
                 </div>
             )}

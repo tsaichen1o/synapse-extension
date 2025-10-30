@@ -244,7 +244,7 @@ function App(): React.JSX.Element {
         }
     }, [chatInput, condensedContent, currentSummary, structuredData]);
 
-    const handleDiscard = useCallback((): void => {
+    const handleReset = useCallback((): void => {
         if (aiRef.current) aiRef.current.reset();
         setSaveCooldown(-1);
         setInitialSummary("");
@@ -266,6 +266,7 @@ function App(): React.JSX.Element {
             }, 1000);
             return () => clearTimeout(timer);
         } else if (saveCooldown === 0) {
+            setSaveCooldown(-1);
             performSave();
         }
     }, [saveCooldown]);
@@ -273,9 +274,7 @@ function App(): React.JSX.Element {
     // Actual save logic
     const performSave = useCallback(async (): Promise<void> => {
         setLoadingPhase("saving");
-        setSaveCooldown(-1); // Prevent re-triggering
         try {
-            // Validate that we have content to save
             if (!currentSummary || Object.keys(structuredData).length === 0) {
                 toast.error("Please capture page content first and let AI generate summary and structured information.");
                 setLoadingPhase("idle");
@@ -304,7 +303,7 @@ function App(): React.JSX.Element {
                 toast.success("Successfully saved to knowledge base!");
             }
 
-            setLoadingPhase("idle");
+            handleReset();
         } catch (error) {
             console.error("Save failed:", error);
             const errorMessage = error instanceof Error ? error.message : "Unknown error";
@@ -411,7 +410,7 @@ function App(): React.JSX.Element {
             {initialSummary && (
                 <ActionButtons
                     loadingPhase={loadingPhase}
-                    onDiscard={handleDiscard}
+                    onDiscard={handleReset}
                     onSave={() => setSaveCooldown(AUTO_CLEAR_COUNTDOWN_SECONDS)}
                     saveCooldown={saveCooldown}
                     onCancelAutoClear={() => setSaveCooldown(-1)}
