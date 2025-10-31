@@ -55,10 +55,7 @@ export class SummarizeService {
 
             return {
                 summary: summary,
-                structuredData: {
-                    ...normalizeStructuredData(structuredData),
-                    ...input.metadata.extra
-                },
+                structuredData: normalizeStructuredData(structuredData),
             };
 
         } catch (error) {
