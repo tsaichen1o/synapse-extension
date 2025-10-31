@@ -26,22 +26,24 @@ export interface CaptureResult {
  * Orchestrates the complete AI-powered page capture pipeline
  * 
  * This service centralizes all AI operations in a clean, sequential flow:
- * 1. Set up progress callbacks (FIRST - ensures they persist)
- * 2. Language detection & translation (uses separate API, doesn't pollute main session)
- * 3. Content type classification (uses main session, but lightweight)
- * 4. Session reset (clean context for condensing pipeline)
+ * 1. Language detection & translation (uses separate API, doesn't pollute main session)
+ * 2. Content type classification (uses main session, but lightweight)
+ * 3. Session reset (clean context for condensing pipeline)
+ * 4. Set condense progress callback (AFTER reset to ensure it persists)
  * 5. Content condensing (iterative processing)
  * 6. Session reset (fresh context for summarization)
- * 7. Image context append (multimodal understanding)
- * 8. Summarization & structured data extraction
+ * 7. Set summarize progress callback (AFTER reset to ensure it persists)
+ * 8. Image context append (multimodal understanding)
+ * 9. Summarization & structured data extraction
  * 
  * Benefits:
  * - Centralized error handling
  * - Clear pipeline stages
- * - Progress tracking with persistent callbacks
+ * - Progress tracking with callbacks set AFTER resets for reliability
  * - Keeps App.tsx clean
  * - Minimal session resets (only 2 total, strategically placed)
  * - Proper session management between major pipeline stages
+ * - Resilient to errors in summarization phase
  */
 export class CaptureOrchestrator {
     constructor(private ai: AI) { }
@@ -57,14 +59,6 @@ export class CaptureOrchestrator {
         pageContent: PageContent,
         callbacks?: CaptureProgressCallbacks
     ): Promise<CaptureResult> {
-        // Set up progress callbacks FIRST, before any operations
-        if (callbacks?.onCondenseProgress) {
-            this.ai.setCondenseProgressCallback(callbacks.onCondenseProgress);
-        }
-        if (callbacks?.onSummarizeProgress) {
-            this.ai.setSummarizeProgressCallback(callbacks.onSummarizeProgress);
-        }
-
         let processedPageContent = pageContent;
 
         // Step 1: Language detection & translation (uses separate API, doesn't pollute main session)
@@ -74,21 +68,26 @@ export class CaptureOrchestrator {
         // This uses the main session but is quick and won't cause issues
         processedPageContent = await this.classifyContentType(processedPageContent);
 
-        // Step 3: Reset session ONCE before the main pipeline
-        // This clears any pollution from classification and prepares for condensing
-        await this.ai.reset();
+        // Set up condense progress callback AFTER reset to ensure it persists
+        if (callbacks?.onCondenseProgress) {
+            this.ai.setCondenseProgressCallback(callbacks.onCondenseProgress);
+        }
 
-        // Step 4: Condense content to fit token limits
+        // Step 3: Condense content to fit token limits
         const condensedContent = await this.ai.condense(processedPageContent);
 
-        // Step 5: Reset session ONCE before summarization
-        // This gives summarization a clean context
+        // Step 4: Reset session ONCE before summarization
         await this.ai.reset();
 
-        // Step 6: Append image context for multimodal understanding
+        // Set up summarize progress callback AFTER reset to ensure it persists
+        if (callbacks?.onSummarizeProgress) {
+            this.ai.setSummarizeProgressCallback(callbacks.onSummarizeProgress);
+        }
+
+        // Step 5: Append image context for multimodal understanding
         await this.ai.appendImageContext(processedPageContent);
 
-        // Step 7: Generate summary and extract structured data
+        // Step 6: Generate summary and extract structured data
         const summaryResult = await this.ai.summarize(condensedContent);
 
         return {
@@ -190,11 +189,24 @@ export class CaptureOrchestrator {
      * Step 2: AI-powered content type classification
      * Intelligently determines the best template for the content
      * 
+     * Only applies AI classification for 'generic' content type.
+     * Specialized extractors (arXiv, Amazon, etc.) know their content type best.
+     * 
      * @private
      */
     private async classifyContentType(pageContent: PageContent): Promise<PageContent> {
         try {
+            const extractorContentType = pageContent.metadata.contentType;
+
+            // Trust specialized extractors - only use AI classifier for generic content
+            if (extractorContentType !== 'generic') {
+                console.log(`✅ Using specialized extractor's content type: ${extractorContentType}`);
+                return pageContent;
+            }
+
+            // Use AI classifier only for generic content
             const classifiedContentType = await this.ai.classifyContentType(pageContent);
+            console.log(`🤖 AI classified generic content as: ${classifiedContentType}`);
 
             return {
                 ...pageContent,

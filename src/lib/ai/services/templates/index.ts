@@ -38,7 +38,7 @@ export interface ContentTemplate {
 export const CONTENT_TEMPLATES: Record<ContentType, ContentTemplate> = {
 	"research-paper": {
 		name: "Research Paper",
-		description: "Academic research publication",
+		description: "Academic research publication with full content",
 		fields: [
 			{
 				key: "authors",
@@ -140,6 +140,98 @@ export const CONTENT_TEMPLATES: Record<ContentType, ContentTemplate> = {
 			"Focus on: (1) research gap and motivation, (2) proposed methodology and approach, (3) key contributions and novelty, (4) quantitative results with metrics, (5) implications and significance",
 		extractionHints:
 			"Distinguish between background/related work vs. the paper's own contributions. Pay special attention to the Abstract, Introduction, and Conclusion sections for key information.",
+	},
+
+	"research-abstract": {
+		name: "Research Paper Abstract",
+		description: "Abstract page of academic research (limited information available)",
+		fields: [
+			{
+				key: "authors",
+				description: "Paper authors",
+				type: "array",
+				priority: "required",
+				examples: ["Jane Smith", "John Doe"],
+			},
+			{
+				key: "keywords",
+				description: "Paper keywords or key terms (if explicitly listed)",
+				type: "array",
+				priority: "required",
+				examples: ["neural networks", "transfer learning", "image segmentation"],
+			},
+			{
+				key: "research_domains",
+				description: "Research fields, subfields, or application domains mentioned",
+				type: "array",
+				priority: "required",
+				examples: ["Computer Vision", "Natural Language Processing", "Medical Imaging", "Reinforcement Learning"],
+			},
+			{
+				key: "core_concepts",
+				description: "Key technical concepts, methods, or approaches mentioned",
+				type: "array",
+				priority: "required",
+				examples: ["transformer architecture", "self-supervised learning", "graph neural networks"],
+			},
+			{
+				key: "problem_addressed",
+				description: "Research problem, gap, or challenge being tackled",
+				type: "string",
+				priority: "required",
+			},
+			{
+				key: "proposed_solution",
+				description: "Main approach, method, or framework proposed (one sentence)",
+				type: "string",
+				priority: "required",
+			},
+			{
+				key: "key_innovation",
+				description: "What is novel or different about this work?",
+				type: "string",
+				priority: "optional",
+			},
+			{
+				key: "datasets_mentioned",
+				description: "Datasets mentioned in abstract",
+				type: "array",
+				priority: "optional",
+				examples: ["ImageNet", "COCO", "GLUE"],
+			},
+			{
+				key: "evaluation_metrics",
+				description: "Performance metrics mentioned",
+				type: "array",
+				priority: "optional",
+				examples: ["accuracy", "F1-score", "BLEU"],
+			},
+			{
+				key: "key_results",
+				description: "Quantitative results or achievements mentioned",
+				type: "array",
+				priority: "optional",
+				examples: ["95% accuracy", "outperforms baseline by 15%", "state-of-the-art on GLUE"],
+			},
+			{
+				key: "technical_terms",
+				description: "Important technical terminology, algorithms, or model names",
+				type: "array",
+				priority: "optional",
+				examples: ["BERT", "ResNet", "attention mechanism", "variational autoencoder"],
+			},
+			{
+				key: "application_areas",
+				description: "Specific application domains or use cases mentioned",
+				type: "array",
+				priority: "optional",
+				examples: ["autonomous driving", "medical diagnosis", "sentiment analysis"],
+			},
+		],
+		summaryGuidelines:
+			"Write a 2-3 sentence summary in this structure: (1) Identify the research domain and problem, highlighting key concepts, (2) Describe the proposed approach and its novelty using specific technical terms, (3) Mention key results or contributions if stated. Be keyword-rich and technically precise.",
+		extractionHints:
+			"Focus on KEYWORDS and TERMINOLOGY extraction. Abstract pages typically contain dense technical language - extract: (1) explicit keywords if listed, (2) domain-specific terms and concepts, (3) method names and technical approaches, (4) dataset and metric names if mentioned. Prioritize concrete technical terms over vague descriptions. If information is not explicitly stated, leave it empty.",
 	},
 
 	article: {
@@ -934,7 +1026,7 @@ export function generateSchemaFromTemplate(template: ContentTemplate): object {
 		type: "object",
 		properties,
 		required,
-		additionalProperties: false,
+		additionalProperties: true,
 	};
 }
 

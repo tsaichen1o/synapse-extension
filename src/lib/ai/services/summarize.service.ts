@@ -56,7 +56,6 @@ export class SummarizeService {
                 summary: summary,
                 structuredData: normalizeStructuredData(structuredData),
             };
-
         } catch (error) {
             console.error("❌ Error in 2-step summarize:", error);
             throw error;
@@ -75,7 +74,10 @@ export class SummarizeService {
         try {
             const schema = generateSchemaFromTemplate(template);
             const prompt = SummarizePrompts.structuredDataExtraction(content, title, template, metadata);
-
+            console.log("🧾 Structured Data Extraction Prompt:", prompt);
+            console.log("🧾 Extraction Schema:", JSON.stringify(schema, null, 2));
+            console.log("🧾 Extraction Schema:", schema);
+            console.log("Length:", prompt.length);
             const result = await this.ai.promptStructured<Record<string, unknown>>(prompt, schema);
 
             return result;

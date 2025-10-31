@@ -19,7 +19,7 @@ export class SummarizePrompts {
     metadata?: CondensedPageContent['metadata']
   ): string {
     const pageTitle = title && title.trim().length > 0 ? title : 'Untitled';
-    const metadataSummary = buildMetadataSummary(metadata);
+    const isResearchAbstract = metadata?.contentType === 'research-abstract';
     const parserCandidates = formatParserCandidates(metadata?.extra);
     const fieldsSection = generateFieldsPromptSection(template);
 
@@ -31,14 +31,15 @@ export class SummarizePrompts {
       `Content Type: ${template.name}`,
     ];
 
-    if (metadataSummary) {
-      parts.push(metadataSummary);
+    // Add minimal metadata (avoid duplication with content)
+    if (metadata?.publishDate) {
+      parts.push(`Published: ${metadata.publishDate}`);
     }
 
-    if (parserCandidates) {
+    // Only show parser candidates if they exist and aren't redundant
+    if (parserCandidates && !isResearchAbstract) {
       parts.push('');
-      parts.push('## Candidate Attributes from Parser:');
-      parts.push('These machine-extracted attributes often contain valuable structured details. Treat them as high-priority leads, preserve precise specifications (dimensions, capacities, model numbers, etc.), and verify them against the content.');
+      parts.push('## Additional Metadata:');
       parts.push(parserCandidates.formatted);
       if (parserCandidates.truncatedNote) {
         parts.push(parserCandidates.truncatedNote);
@@ -50,33 +51,41 @@ export class SummarizePrompts {
     parts.push(content);
     parts.push('');
     parts.push('# Your Task');
-    parts.push('Extract structured data that best represents the content according to the template below. Prioritize keyword-style keys and concise values so that two entities can be compared or linked directly.');
+
+    // Simplified instructions for research-abstract
+    if (isResearchAbstract) {
+      parts.push('Extract basic information from this research abstract. Since this is only an abstract page, information is limited.');
+      parts.push('Only extract what is clearly stated. Leave fields empty if information is not available.');
+    } else {
+      parts.push('Extract structured data that best represents the content according to the template below.');
+    }
+
     parts.push('');
     parts.push(fieldsSection);
     parts.push('');
 
-    if (metadata?.authors && metadata.authors.length > 0) {
-      parts.push(`⚠️ **CRITICAL**: The authors are already identified as: ${metadata.authors.join(', ')}. You MUST include them in the "authors" field.`);
+    // Critical author warning only if not already in content
+    if (metadata?.authors && metadata.authors.length > 0 && !content.includes(metadata.authors[0])) {
+      parts.push(`⚠️ Authors: ${metadata.authors.join(', ')}`);
       parts.push('');
     }
 
     parts.push('**IMPORTANT**:');
-    parts.push('- Include ALL template fields (use [] or "" for empty fields)');
-    parts.push('- Be specific and concrete - avoid vague entries');
-    parts.push('- Express values as concise keywords or short noun phrases (avoid long sentences)');
-    parts.push('- Prefer discrete spec-style values (numbers, units, model identifiers) over descriptive marketing phrasing');
-    parts.push('- Treat every array item as a single fact. Split combined lists like "16GB, 369g" into separate entries.');
-    parts.push('- When capturing measurements or specifications, label them using the property name (e.g., "Weight: 369 g"). Infer the label from nearby wording when it is obvious.');
-    parts.push('- Never return comma-separated bundles of unlabeled values; always create distinct, labeled items or move them into separate fields.');
-    parts.push('- Extract exact names and preserve capitalization');
-    parts.push('- Only include information explicitly mentioned in the content');
 
-    if (parserCandidates) {
-      parts.push('- Start with the parser candidate attributes above and validate each against the content before using them.');
-      parts.push('- Map parser keys to the closest template fields whenever possible; when no template field fits, add a new keyword-style key (lowercase snake_case) with the parser value.');
-      parts.push('- Keep parser-supplied specifications (e.g., size, weight, sku, voltage) verbatim unless the content explicitly contradicts them.');
-      parts.push('- Favor parser terminology for consistency across documents and ignore fuzzy marketing descriptors when a precise spec is available.');
-      parts.push('- Avoid duplicates—merge compatible parser values with existing fields rather than creating redundant entries.');
+    if (isResearchAbstract) {
+      parts.push('- This is ONLY an abstract page - extract only what is explicitly mentioned');
+      parts.push('- Use empty arrays [] or empty strings "" for missing information');
+      parts.push('- Keep it simple - do not infer or guess');
+    } else {
+      parts.push('- Include ALL template fields (use [] or "" for empty fields)');
+      parts.push('- Be specific and concrete - use concise keywords or short phrases');
+      parts.push('- Extract exact names and preserve capitalization');
+      parts.push('- Only include information explicitly mentioned in the content');
+    }
+
+    if (parserCandidates && !isResearchAbstract) {
+      parts.push('- Validate parser metadata against content; map to template fields where possible');
+      parts.push('- Avoid duplicates—merge compatible values rather than creating redundant entries');
     }
 
     return parts.join('\n').trim();
@@ -93,6 +102,7 @@ export class SummarizePrompts {
   ): string {
     const metadataSummary = buildMetadataSummary(metadata);
     const metadataSection = `${metadataSummary ? `${metadataSummary}\n` : ''}Content Type: ${metadata.contentType}`;
+    const isAbstract = metadata.contentType === 'research-abstract';
 
     return `
 # Summary Generation
@@ -107,19 +117,85 @@ ${JSON.stringify(structuredData, null, 2)}
 ${content}
 
 # Your Task
-Write a concise, informative summary (around 150-250 words unless the template specifies otherwise) that suits this ${template.name.toLowerCase()}.
+${isAbstract ?
+        'Write a concise summary with explicitly labeled key information from this research abstract.' :
+        `Write a structured, keyword-explicit summary (around 150-250 words unless the template specifies otherwise) that suits this ${template.name.toLowerCase()}.`
+      }
 
 ## Guidelines for ${template.name}:
 ${template.summaryGuidelines}
 
-## Writing Style:
-- Clear and audience-appropriate tone
-- Flows naturally with good transitions
-- Captures the essence without unnecessary details
-- Uses accessible language
-- Highlights the most important information surfaced in the structured data and content
+${isAbstract ? `
+**Structured Summary Format**:
+Start with a 1-2 sentence overview, then list key information explicitly:
 
-Return ONLY the summary text (no JSON, no markdown headers, just the summary paragraph).
+Example format:
+"[Brief 1-2 sentence overview of the research]
+
+**Domain**: [research field]
+**Problem**: [what problem addressed]  
+**Approach**: [main method/technique]
+**Key Techniques**: [specific methods, algorithms, or architectures]
+**Datasets**: [if mentioned]
+**Results**: [quantitative results if mentioned]
+**Innovation**: [what's novel]"
+
+- Use **bold labels** for categories
+- List concrete values: model names, metrics, datasets, techniques
+- Keep labels consistent and scannable
+- Include only information explicitly stated in the abstract
+` : `
+## Writing Style Requirements:
+
+**Format**: Start with a brief 2-3 sentence narrative overview, then list key information with explicit labels:
+
+**Structure**:
+1. Opening paragraph (2-3 sentences): High-level context and main point
+2. Explicitly labeled key information using **bold labels** followed by concrete values
+
+**Label Format**:
+- Use consistent labels like: **Model**, **Framework**, **Dataset**, **Metric**, **Result**, **Technology**, **Method**, **Author**, **Organization**, etc.
+- Format: "**Label**: value" or "**Label**: value1, value2, value3"
+- Group related items under appropriate labels
+- Be specific with labels - use technical terms from the domain
+
+**Value Format**:
+- Use exact names and terminology (preserve capitalization, version numbers)
+- For lists, separate with commas or semicolons
+- Include units for metrics (e.g., "95.2% accuracy", "$1B", "10ms latency")
+- Keep values concise but precise
+
+**Example** (Research Paper):
+"This work introduces a novel attention mechanism for efficient image processing...
+
+**Model**: ViT-Large  
+**Architecture**: Transformer-based, self-attention  
+**Task**: Image classification  
+**Dataset**: ImageNet, JFT-300M (pre-training)  
+**Metrics**: Top-1 accuracy, inference time  
+**Results**: 88.5% top-1 accuracy, 2.3x faster than baseline  
+**Key Innovation**: Sparse attention pattern, reducing complexity from O(n²) to O(n log n)  
+**Framework**: PyTorch, JAX"
+
+**Example** (Product):
+"Premium wireless headphones with advanced noise cancellation...
+
+**Brand**: Sony  
+**Model**: WH-1000XM5  
+**Price**: $399  
+**Key Features**: Adaptive ANC, 30hr battery, LDAC codec, multipoint connection  
+**Specs**: 40mm drivers, Bluetooth 5.2, USB-C charging  
+**Materials**: Aluminum frame, protein leather earpads  
+**Rating**: 4.7/5 stars"
+
+**Critical Requirements**:
+- Make keywords explicitly extractable with labels
+- Prioritize structured information over flowing prose after the opening
+- Use technical precision - exact model names, proper nouns, specific metrics
+- This format enables easy parsing and knowledge graph construction
+`}
+
+Return ONLY the summary text (no JSON, no markdown headers, just the summary ${isAbstract ? 'sentences' : 'paragraph'}).
         `.trim();
   }
 }

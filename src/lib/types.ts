@@ -75,6 +75,7 @@ export interface ContentSection {
  */
 export type ContentType =
     | 'research-paper'
+    | 'research-abstract'
     | 'article'
     | 'documentation'
     | 'blog'

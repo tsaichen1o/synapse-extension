@@ -104,16 +104,9 @@ export class AI {
         try {
             return await this.nativeSession.prompt(text);
         } catch (error) {
-            console.error('❌ AI prompt failed, attempting session recovery:', error);
-            // Try to recover by resetting the session
-            try {
-                await this.reset();
-                console.log('✅ Session reset successful, retrying prompt...');
-                return await this.nativeSession.prompt(text);
-            } catch (recoveryError) {
-                console.error('❌ Session recovery failed:', recoveryError);
-                throw error; // Throw original error
-            }
+            await this.reset();
+            console.log('✅ Session reset successful, retrying prompt...');
+            throw error;
         }
     }
 
@@ -149,7 +142,7 @@ export class AI {
             try {
                 await this.reset();
                 console.log('✅ Session reset successful, retrying streaming prompt...');
-                
+
                 const stream = this.nativeSession.promptStreaming(prompt);
                 const reader = stream.getReader();
                 let fullResponse = "";
@@ -192,25 +185,11 @@ export class AI {
                 responseConstraint: schema,
                 omitResponseConstraintInput: omitSchemaFromInput,
             });
-
             return JSON.parse(result) as T;
         } catch (error) {
-            console.error('❌ AI structured prompt failed, attempting session recovery:', error);
-            // Try to recover by resetting the session
-            try {
-                await this.reset();
-                console.log('✅ Session reset successful, retrying structured prompt...');
-                
-                const result = await this.nativeSession.prompt(prompt, {
-                    responseConstraint: schema,
-                    omitResponseConstraintInput: omitSchemaFromInput,
-                });
-
-                return JSON.parse(result) as T;
-            } catch (recoveryError) {
-                console.error('❌ Session recovery failed:', recoveryError);
-                throw error; // Throw original error
-            }
+            console.error('❌ AI structured prompt failed, resetting the session.', error);
+            await this.reset();
+            throw error;
         }
     }
 

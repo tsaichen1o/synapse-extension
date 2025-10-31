@@ -113,6 +113,7 @@ export class ContentTypeClassifierService {
     private isValidContentType(type: string): type is ContentType {
         const validTypes: ContentType[] = [
             'research-paper',
+            'research-abstract',
             'article',
             'documentation',
             'blog',

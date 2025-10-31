@@ -45,7 +45,7 @@ export function extractArxivAbstract(doc: Document): PageContent | null {
 
         metadata: {
             authors,
-            contentType: 'research-paper',
+            contentType: 'research-abstract',
             tags,
             description: abstract,
             publishDate: submissionHistory.submittedDate,

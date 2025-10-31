@@ -44,8 +44,8 @@ export class CondenseService {
         this.onProgress = callback;
     }
 
-    private readonly CHUNK_SIZE = 6000;
-    private readonly TARGET_CONDENSED_LENGTH = 8000;
+    private readonly CHUNK_SIZE = 4000;
+    private readonly TARGET_CONDENSED_LENGTH = 6000;
 
     /**
      * Main method: Convert PageContent to CondensedPageContent using iterative AI processing
@@ -143,14 +143,13 @@ export class CondenseService {
     ): Promise<string> {
         const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
         if (totalLength <= this.TARGET_CONDENSED_LENGTH) {
+            console.log("Content is already short enough, skipping AI processing (will be processed in summarize stage)...");
             if (this.onProgress) this.onProgress(1, 2);
             return totalLength > 0 ? chunks.join('\n\n') : '';
         }
 
-        let condensedSummary = await this.initializeCondensedSummary(
-            '', // Description not needed anymore
-            contentType
-        );
+        // For large content: start with empty summary and build incrementally
+        let condensedSummary = "";
 
         for (let i = 0; i < chunks.length; i++) {
             console.log(`📖 Reading and integrating chunk ${i + 1}/${chunks.length} (${chunks[i].length} chars)...`);
@@ -168,27 +167,6 @@ export class CondenseService {
         }
 
         return condensedSummary;
-    }
-
-    /**
-     * Initialize condensed summary structure for incremental building
-     */
-    private async initializeCondensedSummary(
-        description: string,
-        contentType: string
-    ): Promise<string> {
-        const prompt = CondensePrompts.initializeCondensedSummary(
-            description,
-            contentType
-        );
-
-        try {
-            const structure = await this.ai.prompt(prompt);
-            return structure.trim();
-        } catch (error) {
-            console.warn("⚠️  Failed to initialize summary structure:", error);
-            throw error;
-        }
     }
 
     /**
@@ -226,7 +204,8 @@ export class CondenseService {
         condensedContent: string,
         contentType: string
     ): Promise<string> {
-        if (contentType === 'research-paper') return originalTitle;
+        // Keep original title for research papers and abstracts
+        if (contentType === 'research-paper' || contentType === 'research-abstract') return originalTitle;
 
         const prompt = CondensePrompts.generateConciseTitle(
             originalTitle,
