@@ -56,7 +56,7 @@ export class CondenseService {
      */
     async condensePageContent(pageContent: PageContent): Promise<CondensedPageContent> {
         console.log("🔄 Starting iterative content condensing process...");
-        
+
         const contentType = pageContent.metadata.contentType;
         const rawContent = pageContent.fullText || '';
         const originalLength = rawContent.length;
@@ -64,27 +64,20 @@ export class CondenseService {
 
         const chunks = this.splitIntoChunks(rawContent, this.CHUNK_SIZE);
         console.log(`✓ Split into ${chunks.length} chunks`);
+
         try {
-
-            console.log("🔄 Step 3: Processing chunks iteratively...");
-
-            const totalSteps = chunks.length <= 1 ? 2 : chunks.length + 3;
-
             const condensedContent = await this.processChunksIteratively(
                 chunks,
                 contentType,
-                totalSteps
             );
             console.log(`✓ Content condensed to ${condensedContent.length} chars`);
 
-            // Step 4: Generate concise title
-            console.log("✏️  Step 4: Generating concise title...");
             const conciseTitle = await this.generateConciseTitle(
                 pageContent.title || '',
                 condensedContent,
                 contentType
             );
-            if (this.onProgress) this.onProgress(totalSteps, totalSteps);
+            if (this.onProgress) this.onProgress(1, 1);
             console.log(`✓ Generated title: "${conciseTitle}"`);
 
             const compressionRate = condensedContent.length / originalLength;
@@ -147,26 +140,17 @@ export class CondenseService {
     private async processChunksIteratively(
         chunks: string[],
         contentType: string,
-        totalSteps: number
     ): Promise<string> {
         const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
         if (totalLength <= this.TARGET_CONDENSED_LENGTH) {
-            console.log("Content is already small enough, doing single refinement pass...");
-            if (this.onProgress) this.onProgress(1, totalSteps);
-            const ret = totalLength > 0 ? await this.refineContent(chunks.join('\n\n'), contentType) : '';
-            if (this.onProgress) this.onProgress(totalSteps - 1, totalSteps);
-            return ret;
+            if (this.onProgress) this.onProgress(1, 2);
+            return totalLength > 0 ? chunks.join('\n\n') : '';
         }
-
-        // For large content: 1 (init) + chunks.length (process chunks) + 1 (convert to text)
-        // Title generation happens in the parent method
-        const condensingSteps = totalSteps - 1; // Reserve last step for title generation
 
         let condensedSummary = await this.initializeCondensedSummary(
             '', // Description not needed anymore
             contentType
         );
-        if (this.onProgress) this.onProgress(1, totalSteps);
 
         for (let i = 0; i < chunks.length; i++) {
             console.log(`📖 Reading and integrating chunk ${i + 1}/${chunks.length} (${chunks[i].length} chars)...`);
@@ -178,15 +162,12 @@ export class CondenseService {
                 chunks.length,
                 contentType
             );
-            if (this.onProgress) this.onProgress(i + 2, totalSteps);
+            if (this.onProgress) this.onProgress(i + 1, chunks.length + 1);
 
             console.log(`✓ Summary updated (current length: ${condensedSummary.length} chars)`);
         }
 
-        const finalText = await this.convertSummaryToText(condensedSummary, contentType);
-        if (this.onProgress) this.onProgress(condensingSteps, totalSteps);
-
-        return finalText;
+        return condensedSummary;
     }
 
     /**
@@ -233,36 +214,6 @@ export class CondenseService {
             return updatedSummary.trim();
         } catch (error) {
             console.warn(`⚠️  Failed to update summary for chunk ${chunkIndex + 1}, keeping previous summary`);
-            throw error;
-        }
-    }
-
-    /**
-     * Convert structured summary to narrative text
-     */
-    private async convertSummaryToText(structuredSummary: string, contentType: string): Promise<string> {
-        const prompt = CondensePrompts.convertToNarrative(structuredSummary, contentType);
-
-        try {
-            const narrative = await this.ai.prompt(prompt);
-            return narrative.trim();
-        } catch (error) {
-            console.warn("⚠️  Failed to convert to narrative, using structured form", error);
-            throw error;
-        }
-    }
-
-    /**
-     * Refine content that's already within target length
-     */
-    private async refineContent(content: string, contentType: string): Promise<string> {
-        const prompt = CondensePrompts.refine(content, contentType);
-
-        try {
-            const refined = await this.ai.prompt(prompt);
-            return refined.trim();
-        } catch (error) {
-            console.warn("⚠️  Refinement failed, using original", error);
             throw error;
         }
     }

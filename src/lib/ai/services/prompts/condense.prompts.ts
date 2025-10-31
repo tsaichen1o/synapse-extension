@@ -3,36 +3,37 @@
  */
 export class CondensePrompts {
     /**
-     * Initialize condensed summary structure for incremental building
+     * Initialize condensed summary for incremental building
      */
     static initializeCondensedSummary(
         title: string,
         contentType: string
     ): string {
         return `
-Initialize a condensed summary structure for a ${contentType}.
+Initialize a condensed summary for a ${contentType}.
 
 Title: ${title}
 
-Create an initial empty structure that will be incrementally filled as we read through the content.
+You will be reading through content in chunks. Start with an empty summary that will be incrementally built.
 
 ${contentType === 'research-paper' ? `
-For research papers, create a structure with these sections:
-- background: Research background and motivation (initially empty)
-- problem: Problem statement and research gap (initially empty)
-- contribution: Main contributions (initially empty)
-- methodology: Methods and approach (initially empty)
-- results: Key findings and results (initially empty)
-- conclusion: Conclusions and future work (initially empty)
-- technical_details: Important technical details (initially empty)
+For research papers, prepare to capture:
+- Research background and motivation
+- Problem statement and research gap
+- Main contributions
+- Methodology and approach
+- Key findings and results
+- Conclusions and future work
+- Important technical details
 ` : `
-For general content, create a structure with:
-- main_points: Key points (initially empty)
-- details: Supporting details (initially empty)
-- technical_info: Technical information (initially empty)
+For general content, prepare to capture:
+- Main points and key information
+- Supporting details and context
+- Technical information if applicable
 `}
 
-Output a JSON object representing this structure. Use empty strings "" for sections not yet filled.
+Output: Return a brief placeholder like "Summary will be built incrementally as content is read." or similar.
+This will be replaced as we process the actual content chunks.
         `.trim();
     }
 
@@ -47,107 +48,59 @@ Output a JSON object representing this structure. Use empty strings "" for secti
         contentType: string
     ): string {
         return `
-You are updating a condensed summary after reading part ${chunkIndex + 1} of ${totalChunks}.
+You are building a condensed summary by reading content in chunks.
+Progress: Reading part ${chunkIndex + 1} of ${totalChunks}.
 
-## Current Condensed Summary:
+## Current Summary:
 ${currentSummary}
 
 ## New Content Just Read:
 ${newChunk}
 
 # Your Task
-Update the condensed summary by:
+Update the summary by integrating the new content:
 
 ${contentType === 'research-paper' ? `
 **FOR RESEARCH PAPERS**:
-1. **Identify what section** this chunk belongs to (Introduction/Background/Methods/Results/Discussion/Conclusion)
-2. **Update relevant fields**:
-   - If this is background/introduction → update "background" and "problem"
-   - If this is methods → update "methodology" and "technical_details"
-   - If this is results → update "results" with specific numbers and findings
-   - If this is discussion/conclusion → update "conclusion"
+1. **Identify the section** this chunk belongs to (Introduction/Background/Methods/Results/Discussion/Conclusion)
+2. **Integrate relevant information**:
+   - Background/Introduction → Add research context, motivation, and problem statement
+   - Methods → Add methodology, algorithms, and technical approaches
+   - Results → Add specific findings, metrics, and comparisons (keep ALL numbers)
+   - Discussion/Conclusion → Add insights, implications, and future work
 3. **Preserve critical information**:
-   - All numerical results, metrics, comparisons
+   - All numerical results, metrics, performance comparisons
    - Method names, algorithm names, architectural details
-   - Dataset names, experimental setup
-   - Author names if mentioned
-4. **Maintain coherence**: Ensure the updated summary flows logically
-5. **Don't duplicate**: If information is already in the summary, don't repeat it
-6. **Refine if needed**: If new information contradicts or clarifies previous sections, update them
+   - Dataset names, experimental setup details
+   - Author names and references if mentioned
+4. **Write as flowing narrative text**:
+   - Use clear topic transitions
+   - Maintain logical flow from background → methods → results → conclusions
+   - Write in coherent paragraphs, NOT bullet points or JSON
+5. **Avoid duplication**: If information is already covered, don't repeat it
+6. **Refine as needed**: Update earlier parts if new content provides clarification
 
-**CRITICAL**: Keep technical terms exact. Preserve all numbers and proper nouns.
+**CRITICAL**: 
+- Keep technical terms exact
+- Preserve all numbers and proper nouns
+- Output as NARRATIVE TEXT (paragraphs), not structured/JSON format
 ` : `
+**FOR GENERAL CONTENT**:
 1. Identify the main points in this new chunk
-2. Add new information to the appropriate fields
-3. Refine existing information if this chunk provides clarification
-4. Remove redundancy - don't repeat what's already captured
-5. Keep the summary concise but complete
+2. Integrate new information into the narrative
+3. Refine existing content if this chunk provides clarification
+4. Avoid redundancy - don't repeat what's already captured
+5. Write as flowing narrative text with clear transitions
+6. Keep the summary concise but complete
 `}
 
-Output the UPDATED condensed summary as a JSON object with the same structure as the current summary.
-The output should be a COMPLETE summary (not just the changes), ready to be used in the next iteration.
+**Output Format**: 
+Return the COMPLETE updated summary as flowing narrative text (paragraphs).
+NOT as JSON, NOT as bullet points - write as a coherent article/essay.
 
-**IMPORTANT**: Keep the total length under ${contentType === 'research-paper' ? '1200' : '800'} words to avoid token buildup.
-If you need to make room, compress earlier sections slightly, but NEVER lose critical information.
-        `.trim();
-    }
-
-    /**
-     * Convert structured summary to narrative text
-     */
-    static convertToNarrative(structuredSummary: string, contentType: string): string {
-        return `
-Convert this structured summary into a flowing, coherent narrative text.
-
-Structured Summary:
-${structuredSummary}
-
-# Your Task
-Create a well-written, narrative-style summary that:
-
-${contentType === 'research-paper' ? `
-**FOR RESEARCH PAPERS**:
-1. Start with the research problem and motivation
-2. Explain the main contribution and approach
-3. Describe the methodology concisely but completely
-4. Present key results with numbers
-5. Conclude with insights and implications
-6. Use clear topic transitions between sections
-7. Maintain technical accuracy
-` : `
-1. Present information in a logical flow
-2. Use clear transitions between topics
-3. Keep the most important details
-4. Write in clear, professional language
-`}
-
-**IMPORTANT**:
-- Do NOT add information that's not in the structured summary
-- Do NOT lose any critical details (numbers, names, technical terms)
-- Keep it concise (aim for ${contentType === 'research-paper' ? '300-400' : '200-300'} words)
-- Write as continuous text, NOT as bullet points
-
-Return ONLY the narrative text.
-        `.trim();
-    }
-
-    /**
-     * Refine content that's already within target length
-     */
-    static refine(content: string, contentType: string): string {
-        return `
-Refine and improve this ${contentType} content for clarity and conciseness.
-
-Content:
-${content}
-
-Instructions:
-- Keep all important information
-- Improve clarity and flow
-- Remove unnecessary words
-- Maintain professional tone
-
-Return ONLY the refined text.
+**Length Target**: 
+Keep total length under ${contentType === 'research-paper' ? '1200' : '800'} words.
+If you need space, compress earlier sections slightly, but NEVER lose critical information.
         `.trim();
     }
 
