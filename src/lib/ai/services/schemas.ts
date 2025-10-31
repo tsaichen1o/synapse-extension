@@ -8,97 +8,36 @@
 // ============================================================================
 
 /**
- * Intent analysis response from ChatService
+ * Single-pass chat response that handles all chat interactions in one AI call
  */
-export interface IntentAnalysis {
-    intentType: "question" | "modify_summary" | "modify_data" | "add_info" | "remove_info" | "clarify";
-    targetArea: "summary" | "structuredData" | "both" | "none";
-    specificChanges: string[];
-    needsOriginalContent: boolean;
-    userExpectation: string;
-}
-
-/**
- * Schema for intent analysis in ChatService
- */
-export const intentAnalysisSchema = {
-    type: "object",
-    properties: {
-        intentType: {
-            type: "string",
-            enum: ["question", "modify_summary", "modify_data", "add_info", "remove_info", "clarify"]
-        },
-        targetArea: {
-            type: "string",
-            enum: ["summary", "structuredData", "both", "none"]
-        },
-        specificChanges: {
-            type: "array",
-            items: { type: "string" }
-        },
-        needsOriginalContent: {
-            type: "boolean"
-        },
-        userExpectation: {
-            type: "string"
-        }
-    },
-    required: ["intentType", "targetArea", "specificChanges", "needsOriginalContent", "userExpectation"]
-};
-
-/**
- * Modification execution response from ChatService
- */
-export interface Modification {
+export interface ChatResponseGeneration {
+    /** The potentially modified summary (same as current if no changes needed) */
     modifiedSummary: string;
+    /** The potentially modified structured data (same as current if no changes needed) */
     modifiedStructuredData: Record<string, unknown>;
-    changeDescription: string;
+    /** Conversational response to the user */
+    aiResponse: string;
 }
 
 /**
- * Schema for modification execution in ChatService
+ * Schema for single-pass chat response
  */
-export const modificationSchema = {
+export const chatResponseSchema = {
     type: "object",
     properties: {
         modifiedSummary: {
-            type: "string"
+            type: "string",
+            description: "The summary, potentially modified based on user request. If no changes needed, return the current summary unchanged."
         },
         modifiedStructuredData: {
             type: "object",
-            additionalProperties: true
+            additionalProperties: true,
+            description: "The structured data, potentially modified based on user request. If no changes needed, return the current structured data unchanged."
         },
-        changeDescription: {
-            type: "string"
-        }
-    },
-    required: ["modifiedSummary", "modifiedStructuredData", "changeDescription"]
-};
-
-/**
- * Response generation result from ChatService
- */
-export interface ResponseGeneration {
-    aiResponse: string;
-    changesValid: boolean;
-    validationNotes: string;
-}
-
-/**
- * Schema for response generation in ChatService
- */
-export const responseGenerationSchema = {
-    type: "object",
-    properties: {
         aiResponse: {
-            type: "string"
-        },
-        changesValid: {
-            type: "boolean"
-        },
-        validationNotes: {
-            type: "string"
+            type: "string",
+            description: "A conversational response to the user explaining what was done or answering their question"
         }
     },
-    required: ["aiResponse", "changesValid", "validationNotes"]
+    required: ["modifiedSummary", "modifiedStructuredData", "aiResponse"]
 };

@@ -1,163 +1,28 @@
-import type { IntentAnalysis, Modification } from '../schemas';
 import type { StructuredData } from '../../../types';
 
 /**
  * Prompt templates for ChatService
- * All methods accept simple string/object parameters, not complex types
  */
 export class ChatPrompts {
     /**
-     * Step 1: Understand user intent and what needs to be modified
+     * Single-pass chat that handles all interactions in one comprehensive AI call
+     * 
+     * This prompt enables the AI to:
+     * - Understand user intent implicitly
+     * - Decide whether to modify summary/structured data or just answer questions
+     * - Provide a conversational response
+     * - All in one go for better UX and performance
      */
-    static intentAnalysis(
-        currentSummary: string,
-        currentStructuredData: StructuredData,
-        userMessage: string
-    ): string {
-        return `
-# Step 1: Understand User Intent
-
-## Current State:
-Summary: ${currentSummary}...
-Structured Data Keys: ${Object.keys(currentStructuredData).join(', ')}
-
-## User Message:
-"${userMessage}"
-
-# Your Task
-Analyze the user's message and determine:
-1. What is the user asking for? (question, modification, addition, removal, clarification)
-2. What specific parts need to change? (summary, structured data, or both)
-3. What information from the original content is relevant?
-
-Output a JSON object with:
-- intentType: one of "question", "modify_summary", "modify_data", "add_info", "remove_info", "clarify"
-- targetArea: one of "summary", "structuredData", "both", "none"
-- specificChanges: array of specific changes needed
-- needsOriginalContent: boolean indicating if original content is needed
-- userExpectation: brief description of what user expects as output
-        `.trim();
-    }
-
-    /**
-     * Step 2: Execute modifications based on intent analysis
-     */
-    static modification(
-        condensedContent: string,
-        currentSummary: string,
-        currentStructuredData: StructuredData,
-        userMessage: string,
-        intent: IntentAnalysis
-    ): string {
-        const relevantContent = intent.needsOriginalContent
-            ? `\n## Condensed Content Reference:\n${condensedContent}`
-            : '';
-
-        return `
-# Step 2: Execute Modifications
-
-## Intent Analysis:
-- User wants: ${intent.intentType}
-- Target area: ${intent.targetArea}
-- Specific changes: ${intent.specificChanges.join(', ')}
-- User expectation: ${intent.userExpectation}
-
-## Current Summary:
-${currentSummary}
-
-## Current Structured Data:
-${JSON.stringify(currentStructuredData, null, 2)}
-${relevantContent}
-
-## User Request:
-"${userMessage}"
-
-# Your Task
-Based on the intent analysis, make the requested changes:
-- If modifying summary: Rewrite the affected parts while keeping the rest intact
-- If modifying structured data: Update, add, or remove the relevant key-value pairs
-- If answering a question: Prepare a helpful response
-- Ensure changes are accurate and align with the original content when applicable
-
-Output a JSON object with:
-- modifiedSummary: the updated summary or unchanged if not modified
-- modifiedStructuredData: object with updated structured data or unchanged if not modified
-- changeDescription: brief description of what was changed
-        `.trim();
-    }
-
-    /**
-     * Step 3: Generate user-facing response and validate changes
-     */
-    static responseGeneration(
-        userMessage: string,
-        intent: IntentAnalysis,
-        modifications: Modification,
-        originalSummary: string,
-        originalStructuredData: StructuredData
-    ): string {
-        return `
-# Step 3: Generate User Response and Validate
-
-## User Message:
-"${userMessage}"
-
-## Intent:
-${intent.intentType} - ${intent.userExpectation}
-
-## Changes Made:
-${modifications.changeDescription}
-
-## Before and After:
-Summary changed: ${modifications.modifiedSummary !== originalSummary ? 'Yes' : 'No'}
-Structured data changed: ${JSON.stringify(modifications.modifiedStructuredData) !== JSON.stringify(originalStructuredData) ? 'Yes' : 'No'}
-
-# Your Task
-1. Verify the changes are appropriate and complete
-2. Generate a natural, conversational response to the user that:
-   - Acknowledges their request
-   - Explains what was changed (if anything)
-   - Answers their question (if it was a question)
-   - Is friendly and helpful
-
-Output a JSON object with:
-- aiResponse: your conversational response to the user
-- changesValid: boolean indicating if changes are valid
-- validationNotes: any concerns or notes about the changes
-        `.trim();
-    }
-
-    /**
-     * Direct question response (no modifications needed)
-     */
-    static directQuestion(
-        currentSummary: string,
-        currentStructuredData: StructuredData,
-        condensedContent: string,
-        userMessage: string
-    ): string {
-        return `
-Context: ${currentSummary}
-Structured Data: ${JSON.stringify(currentStructuredData)}
-Condensed Content: ${condensedContent}
-
-User Question: "${userMessage}"
-
-Provide a helpful, accurate answer based on the context and condensed content.
-        `.trim();
-    }
-
-    /**
-     * Simple modification (streamlined, no intent analysis)
-     */
-    static simpleModification(
+    static singlePassChat(
         condensedContent: string,
         currentSummary: string,
         currentStructuredData: StructuredData,
         userMessage: string
     ): string {
         return `
-# Execute Simple Modification
+# Intelligent Chat Assistant for Content Refinement
+
+You are helping a user refine their saved web content. The user has a summary and structured data extracted from a webpage, and they want to interact with it through chat.
 
 ## Current Summary:
 ${currentSummary}
@@ -165,39 +30,94 @@ ${currentSummary}
 ## Current Structured Data:
 ${JSON.stringify(currentStructuredData, null, 2)}
 
-## Condensed Content Reference:
+## Condensed Page Content (for reference):
 ${condensedContent}
 
-## User Request:
+## User Message:
 "${userMessage}"
 
 # Your Task
-Make the requested changes to the summary and/or structured data.
-Be precise and only change what the user asked for.
 
-Output a JSON object with:
-- modifiedSummary: the updated summary (or unchanged if not modified)
-- modifiedStructuredData: object with updated structured data (or unchanged if not modified)
-- changeDescription: brief description of what was changed (e.g., "Shortened summary", "Added author information")
-        `.trim();
-    }
+Analyze the user's message and respond appropriately:
 
-    /**
-     * Simple response generation (for simple modifications)
-     */
-    static simpleResponse(
-        userMessage: string,
-        modifications: Modification
-    ): string {
-        return `
-User requested: "${userMessage}"
+**If the user is asking a question:**
+- Answer based on the summary, structured data, and condensed content
+- Keep modifiedSummary and modifiedStructuredData the same as current
+- Set summaryModified and structuredDataModified to false
+- Provide a helpful answer in aiResponse
 
-Changes made: ${modifications.changeDescription}
+**If the user wants to modify the summary or structured data:**
+- Make the requested changes (add, remove, update, shorten, expand, etc.)
+- Update modifiedSummary and/or modifiedStructuredData accordingly
+- Set summaryModified and/or structuredDataModified to true as appropriate
+- Explain what you changed in aiResponse
 
-Generate a brief, friendly response (1-2 sentences) acknowledging what was done.
-Example: "I've shortened the summary as requested." or "Added the author information you mentioned."
+**Guidelines:**
+- Be precise and only change what the user requested
+- Use the condensed content as reference when adding new information
+- Keep the tone conversational and friendly
+- If unclear, make your best interpretation and mention it in the response
+- Maintain the structure and format of existing data
 
-Return ONLY the response text.
+**Output Format:**
+Return a JSON object with:
+- modifiedSummary: string (the summary, modified if requested, otherwise unchanged)
+- modifiedStructuredData: object (the structured data, modified if requested, otherwise unchanged)
+- aiResponse: string (conversational response to the user, 2-3 sentences)
+
+**Examples:**
+
+Example 1 - Simple Question:
+User: "What is this about?"
+Current Summary: "This comprehensive article explores the application of machine learning algorithms in modern healthcare systems..."
+Current Structured Data: {"title": "ML in Healthcare", "author": "Dr. Smith"}
+Output:
+{
+  "modifiedSummary": "This comprehensive article explores the application of machine learning algorithms in modern healthcare systems...",
+  "modifiedStructuredData": {"title": "ML in Healthcare", "author": "Dr. Smith"},
+  "aiResponse": "This article discusses machine learning applications in healthcare, focusing on how AI algorithms can improve diagnostic accuracy and patient outcomes."
+}
+
+Example 2 - Modify Summary:
+User: "Make the summary shorter"
+Current Summary: "This comprehensive article explores the application of machine learning algorithms in modern healthcare systems, discussing various implementation strategies, challenges, and future opportunities in the field."
+Current Structured Data: {"title": "ML in Healthcare", "author": "Dr. Smith"}
+Output:
+{
+  "modifiedSummary": "This article explores machine learning applications in healthcare, covering implementation strategies and future opportunities.",
+  "modifiedStructuredData": {"title": "ML in Healthcare", "author": "Dr. Smith"},
+  "aiResponse": "I've shortened the summary to focus on the key points while keeping the essential information."
+}
+
+Example 3 - Add Structured Data:
+User: "Add the publication date: March 2024"
+Current Summary: "This article explores machine learning in healthcare..."
+Current Structured Data: {"title": "ML in Healthcare", "author": "Dr. Smith"}
+Output:
+{
+  "modifiedSummary": "This article explores machine learning in healthcare...",
+  "modifiedStructuredData": {
+    "title": "ML in Healthcare",
+    "author": "Dr. Smith",
+    "publicationDate": "March 2024"
+  },
+  "aiResponse": "I've added the publication date (March 2024) to the structured data."
+}
+
+Example 4 - Question + Modification:
+User: "What's the main argument and also add it to the structured data"
+Current Summary: "This article argues that AI can significantly improve diagnostic accuracy..."
+Current Structured Data: {"title": "ML in Healthcare", "author": "Dr. Smith"}
+Output:
+{
+  "modifiedSummary": "This article argues that AI can significantly improve diagnostic accuracy...",
+  "modifiedStructuredData": {
+    "title": "ML in Healthcare",
+    "author": "Dr. Smith",
+    "mainArgument": "AI can significantly improve diagnostic accuracy in medical imaging"
+  },
+  "aiResponse": "The main argument is that AI can significantly improve diagnostic accuracy in medical imaging. I've added this to the structured data for you."
+}
         `.trim();
     }
 }

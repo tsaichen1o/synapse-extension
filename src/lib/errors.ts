@@ -12,9 +12,7 @@ export type AIProcessingStep =
     | 'content-extraction'
     | 'structured-data-extraction'
     | 'summary-generation'
-    | 'intent-analysis'
-    | 'modification'
-    | 'response-generation'
+    | 'chat-processing'
     | 'image-processing'
     | 'language-detection'
     | 'translation';
@@ -302,32 +300,6 @@ export const AIErrors = {
             'Failed to generate summary',
             true,
             'Having trouble generating summary. Trying a simpler approach...',
-            originalError
-        );
-    },
-
-    /**
-     * Chat intent analysis failed
-     */
-    intentAnalysisFailed: (originalError: Error): ChatError => {
-        return new ChatError(
-            'intent-analysis',
-            'Failed to analyze user intent',
-            true,
-            'Having trouble understanding your request. Trying direct processing...',
-            originalError
-        );
-    },
-
-    /**
-     * Chat modification failed
-     */
-    modificationFailed: (originalError: Error): ChatError => {
-        return new ChatError(
-            'modification',
-            'Failed to apply modifications',
-            true,
-            'Having trouble making the requested changes. Trying a simpler approach...',
             originalError
         );
     },
