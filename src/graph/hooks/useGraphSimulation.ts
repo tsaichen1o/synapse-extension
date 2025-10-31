@@ -132,7 +132,54 @@ export const useGraphSimulation = ({
             })
             .filter((link): link is SimulationLink => link !== null);
 
+        const neighborMap = new Map<string, Set<string>>();
+        simLinks.forEach(link => {
+            const sourceId = (link.source as SimulationNode).id;
+            const targetId = (link.target as SimulationNode).id;
+
+            if (!neighborMap.has(sourceId)) {
+                neighborMap.set(sourceId, new Set());
+            }
+            if (!neighborMap.has(targetId)) {
+                neighborMap.set(targetId, new Set());
+            }
+            neighborMap.get(sourceId)!.add(targetId);
+            neighborMap.get(targetId)!.add(sourceId);
+        });
+
         let hoveredNode: SimulationNode | null = null;
+        const nodeFocus = new Map<string, number>();
+        const linkFocus = new Map<string, number>();
+
+        simNodes.forEach(node => {
+            if (!nodeFocus.has(node.id)) {
+                nodeFocus.set(node.id, 0.65);
+            }
+        });
+
+        simLinks.forEach(link => {
+            if (!linkFocus.has(link.id)) {
+                linkFocus.set(link.id, 0.7);
+            }
+        });
+
+        const isBrowser = typeof window !== 'undefined';
+        let rafId: number | null = null;
+        const queueRender = () => {
+            if (!isBrowser || rafId != null) {
+                return;
+            }
+            rafId = window.requestAnimationFrame(() => {
+                rafId = null;
+                renderScene();
+            });
+        };
+        const cancelRender = () => {
+            if (rafId != null && isBrowser) {
+                window.cancelAnimationFrame(rafId);
+            }
+            rafId = null;
+        };
 
         const clampNodePosition = (node: SimulationNode) => {
             const radius = getNodeRadius(node.data);
@@ -144,35 +191,39 @@ export const useGraphSimulation = ({
             node.y = Math.min(Math.max(safeY, radius), Math.max(radius, maxY));
         };
 
-        const drawNode = (node: SimulationNode, emphasize: boolean) => {
+        const drawNode = (node: SimulationNode, focus: number) => {
             const radius = getNodeRadius(node.data);
             const isIsolatedValue = node.data.type === 'value' && node.data.meta?.isIsolatedValue;
-            const fillAlpha = emphasize ? 1 : isIsolatedValue ? 0.36 : 1;
-            const labelAlpha = emphasize ? 1 : isIsolatedValue ? 0.7 : 1;
+            const baseAlpha = isIsolatedValue ? 0.32 : 0.55;
+            const fillAlpha = Math.min(1, baseAlpha + focus * 0.55);
+            const labelAlpha = Math.min(1, 0.25 + focus * (isIsolatedValue ? 0.9 : 1));
+            const glowStrength = 8 + focus * 20;
+            const strokeStrength = Math.min(3.4, 1.6 + focus * 1.8);
+            const highlight = focus > 0.82;
 
             context.save();
             context.globalAlpha = fillAlpha;
-            context.shadowColor = 'rgba(45, 55, 72, 0.18)';
-            context.shadowBlur = emphasize ? 18 : 12;
+            context.shadowColor = highlight ? 'rgba(129, 140, 248, 0.5)' : 'rgba(79, 70, 229, 0.18)';
+            context.shadowBlur = glowStrength;
             context.beginPath();
             context.moveTo((node.x ?? 0) + radius, node.y ?? 0);
             context.arc(node.x ?? 0, node.y ?? 0, radius, 0, Math.PI * 2);
             context.fillStyle = getNodeFill(node.data);
             context.fill();
-            context.strokeStyle = '#ffffff';
-            context.lineWidth = emphasize ? 2.6 : 2;
+            context.strokeStyle = 'rgba(255,255,255,0.92)';
+            context.lineWidth = strokeStrength;
             context.stroke();
 
             context.shadowBlur = 0;
             context.globalAlpha = labelAlpha;
-            context.fillStyle = emphasize || !isIsolatedValue ? '#1a202c' : 'rgba(26,32,44,0.68)';
+            context.fillStyle = focus > 0.68 || !isIsolatedValue ? '#111827' : 'rgba(55,65,81,0.55)';
             context.font = '12px Inter, sans-serif';
             context.textAlign = 'center';
             context.fillText(node.data.label, node.x ?? 0, (node.y ?? 0) + radius + 14);
             context.restore();
         };
 
-        const drawLinkLabels = () => {
+        const drawLinkLabels = (highlightedLinkIds: Set<string>, highlightActive: boolean) => {
             context.save();
             context.font = '10px Inter, sans-serif';
             context.textAlign = 'center';
@@ -184,6 +235,9 @@ export const useGraphSimulation = ({
                 const target = link.target as SimulationNode;
                 if (source.x == null || source.y == null || target.x == null || target.y == null) return;
 
+                const isHighlighted = !highlightActive || highlightedLinkIds.has(link.id);
+                const linkIntensity = linkFocus.get(link.id) ?? (isHighlighted ? 0.9 : 0.2);
+                context.globalAlpha = Math.min(0.95, 0.25 + linkIntensity * 0.7);
                 const midX = (source.x + target.x) / 2;
                 const midY = (source.y + target.y) / 2;
                 const text = link.data.label;
@@ -192,48 +246,96 @@ export const useGraphSimulation = ({
                 const boxWidth = metrics.width + padding;
                 const boxHeight = 14;
 
-                context.fillStyle = 'rgba(255,255,255,0.85)';
+                context.fillStyle = 'rgba(255,255,255,0.9)';
                 context.fillRect(midX - boxWidth / 2, midY - boxHeight / 2, boxWidth, boxHeight);
 
                 context.fillStyle = getLinkColor(link.data);
                 context.fillText(text, midX, midY + 0.5);
             });
 
+            context.globalAlpha = 1;
             context.restore();
         };
 
-        const ticked = () => {
+        const renderScene = () => {
             simNodes.forEach(clampNodePosition);
             context.clearRect(0, 0, width, height);
 
-            context.globalAlpha = 0.55;
+            const hoveredId = hoveredNode?.id ?? null;
+            const highlightedNodeIds = new Set<string>();
+            const highlightedLinkIds = new Set<string>();
+
+            if (hoveredId) {
+                highlightedNodeIds.add(hoveredId);
+                const neighbors = neighborMap.get(hoveredId);
+                neighbors?.forEach(id => highlightedNodeIds.add(id));
+
+                simLinks.forEach(link => {
+                    const sourceId = (link.source as SimulationNode).id;
+                    const targetId = (link.target as SimulationNode).id;
+                    if (sourceId === hoveredId || targetId === hoveredId) {
+                        highlightedLinkIds.add(link.id);
+                    }
+                });
+            }
+
+            const highlightActive = highlightedNodeIds.size > 0;
+            const defaultNodeFocus = highlightActive ? 0.18 : 0.65;
+            let needsMoreFrames = false;
+
+            simNodes.forEach(node => {
+                const prev = nodeFocus.get(node.id) ?? defaultNodeFocus;
+                let target = defaultNodeFocus;
+                if (hoveredId && node.id === hoveredId) {
+                    target = 1;
+                } else if (highlightActive && highlightedNodeIds.has(node.id)) {
+                    target = 0.72;
+                }
+                const next = prev + (target - prev) * 0.18;
+                if (Math.abs(next - target) > 0.01) {
+                    needsMoreFrames = true;
+                }
+                nodeFocus.set(node.id, next);
+            });
+
+            simLinks.forEach(link => {
+                const prev = linkFocus.get(link.id) ?? (highlightActive ? 0.18 : 0.72);
+                const target = highlightActive
+                    ? highlightedLinkIds.has(link.id)
+                        ? 0.95
+                        : 0.1
+                    : 0.72;
+                const next = prev + (target - prev) * 0.2;
+                if (Math.abs(next - target) > 0.01) {
+                    needsMoreFrames = true;
+                }
+                linkFocus.set(link.id, next);
+            });
+
             context.lineCap = 'round';
             simLinks.forEach(link => {
                 const source = link.source as SimulationNode;
                 const target = link.target as SimulationNode;
                 if (source.x == null || source.y == null || target.x == null || target.y == null) return;
 
-                context.strokeStyle = getLinkColor(link.data);
-                context.lineWidth = getLinkWidth(link.data);
+                const intensity = linkFocus.get(link.id) ?? 0.6;
+                context.globalAlpha = Math.max(0.08, intensity * 0.85);
+                context.strokeStyle = intensity > 0.55 ? getLinkColor(link.data) : 'rgba(203,213,225,0.55)';
+                const baseWidth = getLinkWidth(link.data);
+                context.lineWidth = baseWidth * (0.8 + intensity * 0.6);
                 context.beginPath();
                 context.moveTo(source.x, source.y);
                 context.lineTo(target.x, target.y);
                 context.stroke();
             });
+            context.globalAlpha = 1;
 
-            drawLinkLabels();
+            drawLinkLabels(highlightedLinkIds, highlightActive);
 
-            const currentHoveredId = hoveredNode ? hoveredNode.id : null;
             simNodes.forEach(node => {
-                if (currentHoveredId && node.id === currentHoveredId) {
-                    return;
-                }
-                drawNode(node, false);
+                const focus = nodeFocus.get(node.id) ?? defaultNodeFocus;
+                drawNode(node, focus);
             });
-
-            if (hoveredNode) {
-                drawNode(hoveredNode, true);
-            }
 
             simNodes.forEach(node => {
                 storedPositions.set(node.id, {
@@ -241,6 +343,10 @@ export const useGraphSimulation = ({
                     y: node.y ?? 0,
                 });
             });
+
+            if (needsMoreFrames) {
+                queueRender();
+            }
         };
 
         const simulation = d3
@@ -250,12 +356,12 @@ export const useGraphSimulation = ({
             .force('center', d3.forceCenter(width / 2, height / 2))
             .force('collision', d3.forceCollide<SimulationNode>(node => getNodeRadius(node.data) + 4))
             .force('radial', d3.forceRadial<SimulationNode>(layoutRadius, centerX, centerY).strength(0.6))
-            .on('tick', ticked);
+            .on('tick', renderScene);
 
         const updateHover = (node: SimulationNode | null) => {
             if (hoveredNode?.id === node?.id) return;
             hoveredNode = node;
-            ticked();
+            renderScene();
         };
 
         const drag = d3
@@ -287,12 +393,8 @@ export const useGraphSimulation = ({
         };
 
         const handlePointerMove = (evt: MouseEvent) => {
-            const node = simulation.find(evt.offsetX, evt.offsetY, 30);
-            if (node && node.data.type === 'value' && node.data.meta?.isIsolatedValue) {
-                updateHover(node);
-            } else {
-                updateHover(null);
-            }
+            const node = simulation.find(evt.offsetX, evt.offsetY, 28);
+            updateHover(node ?? null);
         };
 
         const handlePointerLeave = () => {
@@ -304,12 +406,15 @@ export const useGraphSimulation = ({
         d3.select(canvas).on('mousemove', handlePointerMove);
         d3.select(canvas).on('mouseleave', handlePointerLeave);
 
+        renderScene();
+
         return () => {
             simulation.stop();
             d3.select(canvas).on('click', null);
             d3.select(canvas).on('mousemove', null);
             d3.select(canvas).on('mouseleave', null);
             d3.select(canvas).on('.drag', null);
+            cancelRender();
         };
     }, [
         canvasRef,
