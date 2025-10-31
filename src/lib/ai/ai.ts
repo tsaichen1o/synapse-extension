@@ -98,39 +98,85 @@ export class AI {
 
     /**
      * Send a prompt and get the complete response
+     * Automatically recovers from session errors by resetting
      */
     async prompt(text: string): Promise<string> {
-        return await this.nativeSession.prompt(text);
+        try {
+            return await this.nativeSession.prompt(text);
+        } catch (error) {
+            console.error('❌ AI prompt failed, attempting session recovery:', error);
+            // Try to recover by resetting the session
+            try {
+                await this.reset();
+                console.log('✅ Session reset successful, retrying prompt...');
+                return await this.nativeSession.prompt(text);
+            } catch (recoveryError) {
+                console.error('❌ Session recovery failed:', recoveryError);
+                throw error; // Throw original error
+            }
+        }
     }
 
     /**
      * Send a prompt and get a streaming response
+     * Automatically recovers from session errors by resetting
      */
     async promptStreaming(
         prompt: string,
         onChunk: (chunk: string) => void
     ): Promise<string> {
-        const stream = this.nativeSession.promptStreaming(prompt);
-        const reader = stream.getReader();
-        let fullResponse = "";
-
         try {
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
+            const stream = this.nativeSession.promptStreaming(prompt);
+            const reader = stream.getReader();
+            let fullResponse = "";
 
-                fullResponse += value;
-                onChunk(value);
+            try {
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    fullResponse += value;
+                    onChunk(value);
+                }
+            } finally {
+                reader.releaseLock();
             }
-        } finally {
-            reader.releaseLock();
-        }
 
-        return fullResponse;
+            return fullResponse;
+        } catch (error) {
+            console.error('❌ AI streaming prompt failed, attempting session recovery:', error);
+            // Try to recover by resetting the session
+            try {
+                await this.reset();
+                console.log('✅ Session reset successful, retrying streaming prompt...');
+                
+                const stream = this.nativeSession.promptStreaming(prompt);
+                const reader = stream.getReader();
+                let fullResponse = "";
+
+                try {
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+
+                        fullResponse += value;
+                        onChunk(value);
+                    }
+                } finally {
+                    reader.releaseLock();
+                }
+
+                return fullResponse;
+            } catch (recoveryError) {
+                console.error('❌ Session recovery failed:', recoveryError);
+                throw error; // Throw original error
+            }
+        }
     }
 
     /**
      * Send a prompt and get structured JSON output using JSON Schema
+     * Automatically recovers from session errors by resetting
      * 
      * @param prompt - The prompt text to send to the model
      * @param schema - JSON Schema object to constrain the response format
@@ -141,12 +187,31 @@ export class AI {
         schema: object,
         omitSchemaFromInput: boolean = true
     ): Promise<T> {
-        const result = await this.nativeSession.prompt(prompt, {
-            responseConstraint: schema,
-            omitResponseConstraintInput: omitSchemaFromInput,
-        });
+        try {
+            const result = await this.nativeSession.prompt(prompt, {
+                responseConstraint: schema,
+                omitResponseConstraintInput: omitSchemaFromInput,
+            });
 
-        return JSON.parse(result) as T;
+            return JSON.parse(result) as T;
+        } catch (error) {
+            console.error('❌ AI structured prompt failed, attempting session recovery:', error);
+            // Try to recover by resetting the session
+            try {
+                await this.reset();
+                console.log('✅ Session reset successful, retrying structured prompt...');
+                
+                const result = await this.nativeSession.prompt(prompt, {
+                    responseConstraint: schema,
+                    omitResponseConstraintInput: omitSchemaFromInput,
+                });
+
+                return JSON.parse(result) as T;
+            } catch (recoveryError) {
+                console.error('❌ Session recovery failed:', recoveryError);
+                throw error; // Throw original error
+            }
+        }
     }
 
     /**

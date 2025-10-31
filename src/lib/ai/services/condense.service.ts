@@ -65,9 +65,6 @@ export class CondenseService {
         console.log(`📏 Original content length: ${originalLength} chars`);
 
         try {
-            // Reset AI session for fresh context
-            await this.ai.reset();
-
             // Step 1: Use metadata from extractor (no AI re-extraction)
             console.log("✓ Using metadata from extractor:", pageContent.metadata.contentType);
             const contentType = pageContent.metadata.contentType;
@@ -79,15 +76,21 @@ export class CondenseService {
 
             // Step 3: Process chunks iteratively to condense
             console.log("🔄 Step 3: Processing chunks iteratively...");
+            
+            // Calculate total steps upfront for consistent progress reporting
+            // For small content: 1 (refine) + 1 (title) = 2 steps
+            // For large content: 1 (init) + chunks.length (process) + 1 (convert) + 1 (title)
+            const totalSteps = chunks.length <= 1 ? 2 : chunks.length + 3;
+            
             const condensedContent = await this.processChunksIteratively(
                 chunks,
-                contentType
+                contentType,
+                totalSteps
             );
             console.log(`✓ Content condensed to ${condensedContent.length} chars`);
 
             // Step 4: Generate concise title
             console.log("✏️  Step 4: Generating concise title...");
-            const totalSteps = chunks.length <= 1 ? 3 : chunks.length + 3;
             const conciseTitle = await this.generateConciseTitle(
                 pageContent.title || '',
                 condensedContent,
@@ -155,19 +158,21 @@ export class CondenseService {
      */
     private async processChunksIteratively(
         chunks: string[],
-        contentType: string
+        contentType: string,
+        totalSteps: number
     ): Promise<string> {
         const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
         if (totalLength <= this.TARGET_CONDENSED_LENGTH) {
             console.log("Content is already small enough, doing single refinement pass...");
-            if (this.onProgress) this.onProgress(1, 3);
+            if (this.onProgress) this.onProgress(1, totalSteps);
             const ret = totalLength > 0 ? await this.refineContent(chunks.join('\n\n'), contentType) : '';
-            if (this.onProgress) this.onProgress(2, 3);
+            if (this.onProgress) this.onProgress(totalSteps - 1, totalSteps);
             return ret;
         }
 
-        // Total steps: 1 (init) + chunks.length (process chunks) + 1 (convert to text) + 1 (generate title)
-        const totalSteps = chunks.length + 3;
+        // For large content: 1 (init) + chunks.length (process chunks) + 1 (convert to text)
+        // Title generation happens in the parent method
+        const condensingSteps = totalSteps - 1; // Reserve last step for title generation
 
         let condensedSummary = await this.initializeCondensedSummary(
             '', // Description not needed anymore
@@ -191,7 +196,7 @@ export class CondenseService {
         }
 
         const finalText = await this.convertSummaryToText(condensedSummary, contentType);
-        if (this.onProgress) this.onProgress(totalSteps - 1, totalSteps);
+        if (this.onProgress) this.onProgress(condensingSteps, totalSteps);
 
         return finalText;
     }

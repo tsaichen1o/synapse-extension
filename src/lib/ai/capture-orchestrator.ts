@@ -26,18 +26,22 @@ export interface CaptureResult {
  * Orchestrates the complete AI-powered page capture pipeline
  * 
  * This service centralizes all AI operations in a clean, sequential flow:
- * 1. Language detection & translation (optional)
- * 2. Content type classification
- * 3. Content condensing
- * 4. Session reset (for fresh context)
- * 5. Image context append
- * 6. Summarization & structured data extraction
+ * 1. Set up progress callbacks (FIRST - ensures they persist)
+ * 2. Language detection & translation (uses separate API, doesn't pollute main session)
+ * 3. Content type classification (uses main session, but lightweight)
+ * 4. Session reset (clean context for condensing pipeline)
+ * 5. Content condensing (iterative processing)
+ * 6. Session reset (fresh context for summarization)
+ * 7. Image context append (multimodal understanding)
+ * 8. Summarization & structured data extraction
  * 
  * Benefits:
  * - Centralized error handling
  * - Clear pipeline stages
- * - Progress tracking
+ * - Progress tracking with persistent callbacks
  * - Keeps App.tsx clean
+ * - Minimal session resets (only 2 total, strategically placed)
+ * - Proper session management between major pipeline stages
  */
 export class CaptureOrchestrator {
     constructor(private ai: AI) { }
@@ -53,30 +57,38 @@ export class CaptureOrchestrator {
         pageContent: PageContent,
         callbacks?: CaptureProgressCallbacks
     ): Promise<CaptureResult> {
-        let processedPageContent = pageContent;
-
-        // Step 1: Language detection & translation
-        processedPageContent = await this.preprocessLanguage(processedPageContent, callbacks);
-
-        // Step 2: AI-powered content type classification
-        processedPageContent = await this.classifyContentType(processedPageContent);
-
-        // Step 3: Condense content to fit token limits
+        // Set up progress callbacks FIRST, before any operations
         if (callbacks?.onCondenseProgress) {
             this.ai.setCondenseProgressCallback(callbacks.onCondenseProgress);
         }
-        const condensedContent = await this.ai.condense(processedPageContent);
-
-        // Step 4: Reset session for fresh context (intentional - small context window)
-        await this.ai.reset();
-
-        // Step 5: Append image context for multimodal understanding
-        await this.ai.appendImageContext(processedPageContent);
-
-        // Step 6: Generate summary and extract structured data
         if (callbacks?.onSummarizeProgress) {
             this.ai.setSummarizeProgressCallback(callbacks.onSummarizeProgress);
         }
+
+        let processedPageContent = pageContent;
+
+        // Step 1: Language detection & translation (uses separate API, doesn't pollute main session)
+        processedPageContent = await this.preprocessLanguage(processedPageContent, callbacks);
+
+        // Step 2: AI-powered content type classification
+        // This uses the main session but is quick and won't cause issues
+        processedPageContent = await this.classifyContentType(processedPageContent);
+
+        // Step 3: Reset session ONCE before the main pipeline
+        // This clears any pollution from classification and prepares for condensing
+        await this.ai.reset();
+
+        // Step 4: Condense content to fit token limits
+        const condensedContent = await this.ai.condense(processedPageContent);
+
+        // Step 5: Reset session ONCE before summarization
+        // This gives summarization a clean context
+        await this.ai.reset();
+
+        // Step 6: Append image context for multimodal understanding
+        await this.ai.appendImageContext(processedPageContent);
+
+        // Step 7: Generate summary and extract structured data
         const summaryResult = await this.ai.summarize(condensedContent);
 
         return {

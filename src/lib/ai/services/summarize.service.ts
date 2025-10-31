@@ -33,13 +33,12 @@ export class SummarizeService {
      */
     async summarize(input: CondensedPageContent): Promise<SummaryResponse> {
         try {
-            const totalSteps = 2 + 1;
+            const totalSteps = 2;
             const content = input.condensedContent;
             const title = input.title;
             const metadata = input.metadata;
             const contentType = metadata.contentType;
             const template = getTemplate(contentType);
-            if (this.onProgress) this.onProgress(1, totalSteps);
 
             const structuredData = await this.extractStructuredData(
                 content,
@@ -47,11 +46,11 @@ export class SummarizeService {
                 template,
                 metadata
             );
-            if (this.onProgress) this.onProgress(2, totalSteps);
+            if (this.onProgress) this.onProgress(1, totalSteps);
 
             let summary = await this.generateSummary(content, structuredData, template, metadata);
             summary = summary.trim();
-            if (this.onProgress) this.onProgress(3, totalSteps);
+            if (this.onProgress) this.onProgress(2, totalSteps);
 
             return {
                 summary: summary,
