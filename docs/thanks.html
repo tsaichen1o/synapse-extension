@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Thank You - Synapse</title>
+		<link rel="preconnect" href="https://fonts.googleapis.com" />
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+		<link
+			href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=Roboto+Mono:wght@400;700&display=swap"
+			rel="stylesheet"
+		/>
+		<style>
+			:root {
+				--bg-color: #f9fafb;
+				--text-color: #374151;
+				--primary-color: #9b59b6;
+				--secondary-color: #e94b8a;
+				--glow-size: 1200px;
+			}
+			html,
+			body {
+				margin: 0;
+				padding: 0;
+				width: 1920px;
+				height: 1080px;
+				overflow: hidden;
+				background-color: var(--bg-color);
+				color: var(--text-color);
+				font-family: "Inter", sans-serif;
+				display: flex;
+				justify-content: center;
+				align-items: center;
+				position: relative;
+			}
+			.background-glow {
+				position: absolute;
+				width: var(--glow-size);
+				height: var(--glow-size);
+				background: radial-gradient(
+					circle,
+					var(--primary-color) 0%,
+					var(--secondary-color) 100%
+				);
+				filter: blur(200px);
+				opacity: 0.2;
+				top: 50%;
+				left: 50%;
+				transform: translate(-50%, -50%);
+				animation: spin 20s linear infinite;
+			}
+			@keyframes spin {
+				0% {
+					transform: translate(-50%, -50%) rotate(0deg);
+				}
+				100% {
+					transform: translate(-50%, -50%) rotate(360deg);
+				}
+			}
+			.content {
+				text-align: center;
+				z-index: 1;
+				padding: 40px;
+			}
+			h1 {
+				font-size: 128px;
+				font-weight: 900;
+				margin: 0;
+				line-height: 1.1;
+				background: linear-gradient(
+					45deg,
+					var(--primary-color),
+					var(--secondary-color)
+				);
+				-webkit-background-clip: text;
+				background-clip: text;
+				color: transparent;
+			}
+			p {
+				font-size: 48px;
+				font-weight: 400;
+				margin-top: 30px;
+				color: #4b5563;
+			}
+			.qr-code {
+				margin-top: 50px;
+				background: white;
+				padding: 20px;
+				border-radius: 16px;
+				display: inline-block;
+				box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1),
+					0 10px 10px -5px rgba(0, 0, 0, 0.04);
+			}
+			.qr-code img {
+				display: block;
+				width: 200px;
+				height: 200px;
+			}
+			.repo-link {
+				margin-top: 20px;
+				font-family: "Roboto Mono", monospace;
+				font-size: 24px;
+				color: var(--secondary-color);
+			}
+		</style>
+	</head>
+	<body>
+		<div class="background-glow"></div>
+		<div class="content">
+			<h1>Thank You</h1>
+			<p>Scan to visit our repository</p>
+			<div class="qr-code">
+				<!-- Placeholder for QR Code. You can generate a QR code for your repo URL and embed it here -->
+				<img
+					src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https://github.com/tsaichen1o/synapse-extension"
+					alt="GitHub Repository QR Code"
+				/>
+			</div>
+			<p class="repo-link">github.com/tsaichen1o/synapse-extension</p>
+		</div>
+	</body>
+</html>

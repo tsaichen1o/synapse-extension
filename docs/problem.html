@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>The Problem - Synapse</title>
+		<link rel="preconnect" href="https://fonts.googleapis.com" />
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+		<link
+			href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=Roboto+Mono:wght@400;700&display=swap"
+			rel="stylesheet"
+		/>
+		<style>
+			:root {
+				--bg-color: #f9fafb;
+				--text-color: #374151;
+				--primary-color: #9b59b6;
+				--secondary-color: #e94b8a;
+				--glow-size: 1000px;
+			}
+			html,
+			body {
+				margin: 0;
+				padding: 0;
+				width: 1920px;
+				height: 1080px;
+				overflow: hidden;
+				background-color: var(--bg-color);
+				color: var(--text-color);
+				font-family: "Inter", sans-serif;
+				display: flex;
+				justify-content: center;
+				align-items: center;
+				position: relative;
+			}
+			.background-glow {
+				position: absolute;
+				width: var(--glow-size);
+				height: var(--glow-size);
+				background: radial-gradient(
+					circle,
+					var(--primary-color) 0%,
+					transparent 60%
+				);
+				filter: blur(150px);
+				opacity: 0.25;
+				top: 50%;
+				left: 50%;
+				transform: translate(-50%, -50%);
+				animation: pulse 8s infinite alternate;
+			}
+			@keyframes pulse {
+				0% {
+					transform: translate(-50%, -50%) scale(0.8);
+					opacity: 0.2;
+				}
+				100% {
+					transform: translate(-50%, -50%) scale(1.2);
+					opacity: 0.3;
+				}
+			}
+			.content {
+				text-align: center;
+				z-index: 1;
+				padding: 40px;
+			}
+			h1 {
+				font-size: 96px;
+				font-weight: 900;
+				margin: 0;
+				line-height: 1.1;
+				background: linear-gradient(45deg, #6d28d9, #be185d);
+				-webkit-background-clip: text;
+				background-clip: text;
+				color: transparent;
+			}
+			p {
+				font-size: 48px;
+				font-weight: 400;
+				margin-top: 30px;
+				color: #4b5563;
+				max-width: 1200px;
+			}
+			.highlight {
+				font-weight: 700;
+				color: var(--secondary-color);
+			}
+		</style>
+	</head>
+	<body>
+		<div class="background-glow"></div>
+		<div class="content">
+			<h1>The Web is a Mess.</h1>
+			<p>
+				Information is <span class="highlight">scattered</span>, context
+				is <span class="highlight">lost</span>, and knowledge is
+				<span class="highlight">disconnected</span>.
+			</p>
+		</div>
+	</body>
+</html>
