@@ -4,3 +4,4 @@ export { CondenseService } from './condense.service';
 export { ImageService } from './image.service';
 export { LanguageDetectorService } from './language-detector.service';
 export { TranslatorService } from './translator.service';
+export { ContentTypeClassifierService } from './content-type-classifier.service';

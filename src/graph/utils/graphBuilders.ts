@@ -185,6 +185,7 @@ const jaccardSimilarity = (left: Set<string>, right: Set<string>): number => {
 };
 
 const buildClusterViewGraph = (notes: SynapseNode[]): GraphBuildResult => {
+    // Extract keywords and convert to consistent data structure
     const keywordData = notes
         .filter(note => note.id != null)
         .map(note => ({
@@ -195,29 +196,33 @@ const buildClusterViewGraph = (notes: SynapseNode[]): GraphBuildResult => {
     const clusters: Array<{ notes: SynapseNode[]; keywords: string[] }> = [];
     const visited = new Set<number>();
 
+    // Build clusters using BFS with keyword similarity
     keywordData.forEach(entry => {
         if (entry.note.id == null || visited.has(entry.note.id)) return;
 
-        const queue: Array<{ note: SynapseNode; keywords: Set<string> }> = [entry];
+        const queue = [entry];
         const clusterNotes: SynapseNode[] = [];
 
         while (queue.length > 0) {
-            const current = queue.shift();
-            if (!current || !current.note.id || visited.has(current.note.id)) continue;
-            visited.add(current.note.id);
+            const current = queue.shift()!;
+            if (visited.has(current.note.id!)) continue;
+
+            visited.add(current.note.id!);
             clusterNotes.push(current.note);
 
+            // Find similar unvisited notes
             keywordData.forEach(other => {
-                if (!other.note.id || visited.has(other.note.id) || other.note.id === current.note.id) return;
+                if (!other.note.id || visited.has(other.note.id)) return;
+
                 const similarity = jaccardSimilarity(current.keywords, other.keywords);
                 if (similarity >= KEYWORD_SIMILARITY_THRESHOLD) {
                     queue.push(other);
+                    visited.add(other.note.id); // Mark as visited to avoid duplicates in queue
                 }
             });
         }
 
-        if (clusterNotes.length === 0) return;
-
+        // Aggregate keywords from all notes in cluster
         const keywordCount = new Map<string, number>();
         clusterNotes.forEach(note => {
             const kws = extractKeywords(note.summary || '', note.structuredData || {});
@@ -226,27 +231,21 @@ const buildClusterViewGraph = (notes: SynapseNode[]): GraphBuildResult => {
             });
         });
 
+        // Get top keywords sorted by frequency
         const topKeywords = Array.from(keywordCount.entries())
             .sort((a, b) => b[1] - a[1])
+            .slice(0, 5) // Limit to top 5 keywords
             .map(([word]) => word);
 
         clusters.push({ notes: clusterNotes, keywords: topKeywords });
     });
 
-    if (clusters.length === 0) {
-        notes.forEach(note => {
-            if (note.id == null) return;
-            clusters.push({
-                notes: [note],
-                keywords: Array.from(extractKeywords(note.summary || '', note.structuredData || {})).slice(0, 4),
-            });
-        });
-    }
-
+    // Create graph nodes and links
     const nodes: GraphNodeData[] = [];
     const links: GraphLinkData[] = [];
     const noteNodes = new Map<number, GraphNodeData>();
 
+    // Create note nodes
     notes.forEach(note => {
         if (note.id == null) return;
         const graphNode: GraphNodeData = {
@@ -259,11 +258,14 @@ const buildClusterViewGraph = (notes: SynapseNode[]): GraphBuildResult => {
         noteNodes.set(note.id, graphNode);
     });
 
+    // Create cluster nodes and links
     clusters.forEach((cluster, index) => {
         const clusterId = `cluster:${index}`;
         const clusterNode: GraphNodeData = {
             id: clusterId,
-            label: cluster.keywords.length > 0 ? cluster.keywords.join(', ') : `Cluster ${index + 1}`,
+            label: cluster.keywords.length > 0
+                ? cluster.keywords.join(', ')
+                : `Cluster ${index + 1}`,
             type: 'cluster',
             meta: {
                 clusterSize: cluster.notes.length,
@@ -272,14 +274,13 @@ const buildClusterViewGraph = (notes: SynapseNode[]): GraphBuildResult => {
         };
         nodes.push(clusterNode);
 
+        // Link each note to its cluster
         cluster.notes.forEach(note => {
             if (note.id == null) return;
-            const noteNode = noteNodes.get(note.id);
-            if (!noteNode) return;
             links.push({
                 id: `cluster:${clusterId}:${note.id}`,
                 sourceId: clusterId,
-                targetId: noteNode.id,
+                targetId: `note:${note.id}`,
                 label: 'member',
                 meta: { type: 'cluster' },
             });

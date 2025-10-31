@@ -1,4 +1,6 @@
 export { AI } from "./ai";
+export { CaptureOrchestrator } from "./capture-orchestrator";
+export type { CaptureResult, CaptureProgressCallbacks } from "./capture-orchestrator";
 
 /**
  * Check if Chrome Built-in AI is available.

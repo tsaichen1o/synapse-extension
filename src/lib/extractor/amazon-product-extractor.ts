@@ -212,7 +212,7 @@ export function extractAmazonProduct(doc: Document): PageContent | null {
         fullText: mainContent,
         metadata: {
             description: description || features.join(' '),
-            contentType: 'article', // Using 'article' as the closest standard type
+            contentType: 'product',
             tags: features,
             extra: {
                 // Amazon-specific data stored in extra field

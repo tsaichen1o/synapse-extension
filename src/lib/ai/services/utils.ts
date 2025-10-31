@@ -15,7 +15,7 @@ export function stringifyStructuredValue(value: unknown): string {
     }
 
     if (typeof value === 'string') {
-        return value;
+        return value.trim();
     }
 
     if (typeof value === 'number' || typeof value === 'boolean') {
@@ -51,26 +51,95 @@ export function stringifyStructuredValue(value: unknown): string {
 export function normalizeStructuredData(data: Record<string, unknown>): Record<string, unknown> {
     const normalized: Record<string, unknown> = {};
 
-    for (const [key, value] of Object.entries(data)) {
-        if (value === null || value === undefined) {
-            // Preserve null/undefined values
-            normalized[key] = value;
-        } else if (Array.isArray(value)) {
-            // Keep arrays as arrays, but ensure items are properly formatted
-            normalized[key] = value.map(item => {
-                if (typeof item === 'object' && item !== null) {
-                    return stringifyStructuredValue(item);
-                }
-                return item;
-            });
-        } else if (typeof value === 'object') {
-            // Convert nested objects to readable strings
-            normalized[key] = stringifyStructuredValue(value);
-        } else {
-            // Keep primitives as-is
-            normalized[key] = value;
+    Object.entries(data).forEach(([key, value]) => {
+        const normalizedValue = normalizeStructuredValue(value);
+        if (normalizedValue !== undefined) {
+            normalized[key] = normalizedValue;
         }
-    }
+    });
 
     return normalized;
+}
+
+type ArrayPrimitive = string | number | boolean | Date;
+
+function normalizeStructuredValue(value: unknown): unknown | undefined {
+    if (value === null || value === undefined) {
+        return undefined;
+    }
+
+    if (typeof value === 'string') {
+        const trimmed = value.trim();
+        return trimmed.length > 0 ? trimmed : undefined;
+    }
+
+    if (typeof value === 'number' || typeof value === 'boolean') {
+        return value;
+    }
+
+    if (value instanceof Date) {
+        return value;
+    }
+
+    if (Array.isArray(value)) {
+        const collected: ArrayPrimitive[] = [];
+
+        value.forEach(item => {
+            const normalizedItem = normalizeArrayValue(item);
+
+            if (Array.isArray(normalizedItem)) {
+                normalizedItem.forEach(entry => collected.push(entry));
+            } else if (normalizedItem !== undefined) {
+                collected.push(normalizedItem);
+            }
+        });
+
+        return collected.length > 0 ? collected : undefined;
+    }
+
+    if (typeof value === 'object') {
+        const stringified = stringifyStructuredValue(value).trim();
+        return stringified.length > 0 ? stringified : undefined;
+    }
+
+    return undefined;
+}
+
+function normalizeArrayValue(value: unknown): ArrayPrimitive | ArrayPrimitive[] | undefined {
+    if (value === null || value === undefined) {
+        return undefined;
+    }
+
+    if (typeof value === 'string') {
+        const trimmed = value.trim();
+        return trimmed.length > 0 ? trimmed : undefined;
+    }
+
+    if (typeof value === 'number' || typeof value === 'boolean') {
+        return value;
+    }
+
+    if (value instanceof Date) {
+        return value;
+    }
+
+    if (Array.isArray(value)) {
+        const nested: ArrayPrimitive[] = [];
+        value.forEach(item => {
+            const normalizedItem = normalizeArrayValue(item);
+            if (Array.isArray(normalizedItem)) {
+                normalizedItem.forEach(entry => nested.push(entry));
+            } else if (normalizedItem !== undefined) {
+                nested.push(normalizedItem);
+            }
+        });
+        return nested.length > 0 ? nested : undefined;
+    }
+
+    if (typeof value === 'object') {
+        const text = stringifyStructuredValue(value).trim();
+        return text.length > 0 ? text : undefined;
+    }
+
+    return undefined;
 }

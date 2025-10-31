@@ -6,3 +6,4 @@
 export { SummarizePrompts } from './summarize.prompts';
 export { ChatPrompts } from './chat.prompts';
 export { CondensePrompts } from './condense.prompts';
+export { ContentTypeClassifierPrompts } from './content-type-classifier.prompts';

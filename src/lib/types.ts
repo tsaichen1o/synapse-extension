@@ -79,6 +79,11 @@ export type ContentType =
     | 'documentation'
     | 'blog'
     | 'wiki'
+    | 'product'
+    | 'recipe'
+    | 'tutorial'
+    | 'news'
+    | 'review'
     | 'generic';
 
 /**

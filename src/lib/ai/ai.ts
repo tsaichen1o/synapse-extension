@@ -9,6 +9,7 @@ import type {
     LanguageDetectionRequestOptions,
     LanguageDetectionResult,
     TranslationRequestOptions,
+    ContentType,
 } from '../types';
 import {
     SummarizeService,
@@ -16,7 +17,8 @@ import {
     CondenseService,
     ImageService,
     LanguageDetectorService,
-    TranslatorService
+    TranslatorService,
+    ContentTypeClassifierService
 } from './services';
 
 /**
@@ -31,6 +33,7 @@ export class AI {
     private readonly imageService: ImageService;
     private readonly languageDetectorService: LanguageDetectorService;
     private readonly translatorService: TranslatorService;
+    private readonly contentTypeClassifierService: ContentTypeClassifierService;
 
 
     private constructor(session: AILanguageModelSession) {
@@ -42,6 +45,7 @@ export class AI {
         this.imageService = new ImageService(this);
         this.languageDetectorService = new LanguageDetectorService();
         this.translatorService = new TranslatorService();
+        this.contentTypeClassifierService = new ContentTypeClassifierService(this);
     }
 
     /**
@@ -282,5 +286,15 @@ export class AI {
         onChunk?: (chunk: string) => void
     ): Promise<string> {
         return this.translatorService.translateStreaming(text, options, onChunk);
+    }
+
+    /**
+     * Classify content type using AI analysis
+     * This intelligently determines the best template for the content
+     * Falls back to extractor hint on error
+     * Delegates to ContentTypeClassifierService
+     */
+    async classifyContentType(pageContent: PageContent): Promise<ContentType> {
+        return this.contentTypeClassifierService.classify(pageContent);
     }
 }

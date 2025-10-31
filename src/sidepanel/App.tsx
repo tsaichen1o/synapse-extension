@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import toast from 'react-hot-toast';
 import { db } from "../lib/db";
-import { AI, isAIAvailable } from "../lib/ai";
+import { AI, isAIAvailable, CaptureOrchestrator } from "../lib/ai";
 import { getPageContent } from "../lib/helper";
 import { ChatMessage, LoadingPhase, PageContent, StructuredData, CondensedPageContent, SynapseNode } from "../lib/types";
 import { WelcomeScreen } from "./components/WelcomeScreen";
@@ -45,6 +45,7 @@ function App(): React.JSX.Element {
     const [saveCooldown, setSaveCooldown] = useState<number>(-1);
 
     const aiRef = useRef<AI | null>(null);
+    const orchestratorRef = useRef<CaptureOrchestrator | null>(null);
 
     // Auto-scroll to bottom when new messages are added
     useEffect(() => {
@@ -121,6 +122,7 @@ function App(): React.JSX.Element {
                 topK: 50,
                 systemPrompt: 'You are a helpful assistant that analyzes web content, creates summaries, and refines structured data based on user feedback.'
             });
+            orchestratorRef.current = new CaptureOrchestrator(aiRef.current);
             setIsAiInitialized(true);
             setIsInitializing(false);
             toast.success("AI initialized successfully!");
@@ -132,7 +134,7 @@ function App(): React.JSX.Element {
     }, []);
 
     const handleCapturePage = useCallback(async (): Promise<void> => {
-        if (!aiRef.current) {
+        if (!aiRef.current || !orchestratorRef.current) {
             toast.error("AI is not ready. Please wait or refresh the page.");
             return;
         }
@@ -147,89 +149,39 @@ function App(): React.JSX.Element {
         setSummarizeProgress(null);
 
         try {
+            // Step 1: Extract page content
             const pageContent = await getPageContent();
-            let processedPageContent = pageContent;
 
-            if (aiRef.current) {
-                try {
-                    const detectionSource = (pageContent.fullText || pageContent.mainContent || '').trim();
-                    if (detectionSource) {
-                        const languageResults = await aiRef.current.detectLanguage(detectionSource.slice(0, 8000));
-                        const [topResult] = languageResults;
-
-                        const detectedCode = topResult?.detectedLanguage?.toLowerCase();
-                        const isEnglish = detectedCode ? detectedCode === 'en' || detectedCode.startsWith('en-') : false;
-
-                        if (topResult && detectedCode && !isEnglish && topResult.confidence >= 0.3) {
-                            const translationOptions = {
-                                sourceLanguage: topResult.detectedLanguage,
-                                targetLanguage: 'en' as const,
-                            };
-
-                            const loadingId = toast.loading(`Detected ${topResult.detectedLanguage}. Translating content to English...`);
-
-                            try {
-                                const translateText = async (text?: string) => {
-                                    if (!text?.trim()) return text;
-                                    return await aiRef.current!.translateStreaming(text, translationOptions);
-                                };
-
-                                const [translatedAbstract, translatedMainContent, translatedFullText] = await Promise.all([
-                                    translateText(pageContent.abstract),
-                                    translateText(pageContent.mainContent),
-                                    translateText(pageContent.fullText),
-                                ]);
-
-                                processedPageContent = {
-                                    ...pageContent,
-                                    abstract: translatedAbstract ?? pageContent.abstract,
-                                    mainContent: translatedMainContent ?? pageContent.mainContent,
-                                    fullText: translatedFullText ?? pageContent.fullText,
-                                    metadata: {
-                                        ...pageContent.metadata,
-                                        extra: {
-                                            ...pageContent.metadata.extra,
-                                            originalLanguage: topResult.detectedLanguage,
-                                            languageDetectionConfidence: topResult.confidence,
-                                        },
-                                    },
-                                };
-
-                                toast.success('Page content translated to English.', { id: loadingId });
-                            } catch (translationError) {
-                                console.error('Translation failed, using original content.', translationError);
-                                toast.error('Failed to translate content. Continuing with original language.', { id: loadingId });
-                                processedPageContent = pageContent;
-                            }
-                        }
-                    }
-                } catch (detectionError) {
-                    console.warn('Language detection failed. Proceeding without translation.', detectionError);
-                }
-            }
-
-            setCurrentPageContent(processedPageContent);
-
+            // Step 2: Execute complete AI pipeline via orchestrator
             setLoadingPhase("condensing");
-
-            aiRef.current.setCondenseProgressCallback((current: number, total: number) => {
-                setCondenseProgress({ current, total });
+            
+            const result = await orchestratorRef.current.execute(pageContent, {
+                onTranslationStart: (language: string) => {
+                    toast.loading(`Detected ${language}. Translating to English...`, { id: 'translation' });
+                },
+                onTranslationComplete: () => {
+                    toast.success('Content translated to English.', { id: 'translation' });
+                },
+                onTranslationError: (error: Error) => {
+                    console.error('Translation failed:', error);
+                    toast.error('Translation failed. Continuing with original language.', { id: 'translation' });
+                },
+                onCondenseProgress: (current, total) => {
+                    setCondenseProgress({ current, total });
+                },
+                onSummarizeProgress: (current, total) => {
+                    setLoadingPhase("summarizing");
+                    setSummarizeProgress({ current, total });
+                },
             });
-            const condensed = await aiRef.current.condense(processedPageContent);
-            setCondensedContent(condensed);
-            setCondenseProgress(null);
 
-            await aiRef.current.reset();
-            await aiRef.current.appendImageContext(processedPageContent);
-
-            setLoadingPhase("summarizing");
-            aiRef.current.setSummarizeProgressCallback((current: number, total: number) => {
-                setSummarizeProgress({ current, total });
-            });
-            const result = await aiRef.current.summarize(condensed);
+            // Step 3: Update UI with results
+            setCurrentPageContent(result.processedPageContent);
+            setCondensedContent(result.condensedContent);
             setInitialSummary(result.summary);
             setCurrentSummary(result.summary);
             setStructuredData(result.structuredData);
+            setCondenseProgress(null);
             setSummarizeProgress(null);
 
             setHasUserInteracted(false);

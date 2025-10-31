@@ -65,6 +65,9 @@ export class SummarizePrompts {
     parts.push('- Be specific and concrete - avoid vague entries');
     parts.push('- Express values as concise keywords or short noun phrases (avoid long sentences)');
     parts.push('- Prefer discrete spec-style values (numbers, units, model identifiers) over descriptive marketing phrasing');
+    parts.push('- Treat every array item as a single fact. Split combined lists like "16GB, 369g" into separate entries.');
+    parts.push('- When capturing measurements or specifications, label them using the property name (e.g., "Weight: 369 g"). Infer the label from nearby wording when it is obvious.');
+    parts.push('- Never return comma-separated bundles of unlabeled values; always create distinct, labeled items or move them into separate fields.');
     parts.push('- Extract exact names and preserve capitalization');
     parts.push('- Only include information explicitly mentioned in the content');
 
