@@ -188,9 +188,8 @@ function App(): React.JSX.Element {
             setChatMessages([
                 {
                     sender: "system",
-                    text: `I have captured and summarized the page content. Here is the generated structured information:`,
+                    text: `I have captured and summarized the page content. Do you have any questions or need further requests?`,
                 },
-                { sender: "assistant", text: `Summary: "${result.summary}"` },
             ]);
             setLoadingPhase("idle");
         } catch (error) {
