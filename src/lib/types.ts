@@ -87,54 +87,6 @@ export type ContentType =
     | 'generic';
 
 /**
- * Paper-specific structured metadata
- */
-export interface PaperStructure {
-    researchQuestion?: string;
-    mainContribution?: string;
-    methodology?: string;
-    keyFindings?: string;
-}
-
-/**
- * Reference/Citation structure for academic papers
- */
-export interface Reference {
-    /** Unique ID (e.g., "bib.bib46") */
-    id: string;
-    /** Citation key/label (e.g., "Zhao et al. (2024)") */
-    label: string;
-    /** Raw citation text */
-    citationText: string;
-    /** Parsed author names (if possible) */
-    authors?: string[];
-    /** Paper title (if identifiable) */
-    title?: string;
-    /** Venue/Journal name (if identifiable) */
-    venue?: string;
-    /** Publication year (if identifiable) */
-    year?: string;
-    /** DOI (if available) */
-    doi?: string;
-    /** URL (if available) */
-    url?: string;
-}
-
-/**
- * Figure/Table metadata
- */
-export interface Figure {
-    /** Figure ID (e.g., "S1.F1") */
-    id: string;
-    /** Figure caption */
-    caption: string;
-    /** Image source URL (if available) */
-    imageUrl?: string;
-    /** Figure number (e.g., "1", "2.1") */
-    number?: string;
-}
-
-/**
  * Condensed content structure that's optimized for AI processing
  * This structure significantly reduces token usage while preserving all essential information
  */
@@ -159,17 +111,16 @@ export interface CondensedPageContent {
  * AI Services only interact with this interface - they don't need to know about extractor-specific details
  */
 export interface PageContent {
-    // === Basic Information ===
     /** Page title */
     title: string;
+
     /** Page URL */
     url: string;
 
-    // === Main Content ===
     /** Canonical full text (markdown or plain text) */
     fullText: string;
 
-    // === Standardized Metadata ===
+    /** Standardized metadata */
     metadata: {
         /** Authors (for papers, articles with bylines) */
         authors?: string[];
@@ -183,28 +134,15 @@ export interface PageContent {
         description?: string;
         /** Structured sections (if content has clear sections) */
         sections?: ContentSection[];
-        /** Research paper specific structure */
-        paperStructure?: PaperStructure;
-        /** References/Bibliography (for academic papers) */
-        references?: Reference[];
-        /** Figures and tables (for academic papers and technical docs) */
-        figures?: Figure[];
-        /** ArXiv version (e.g., "v1", "v2") */
-        arxivVersion?: string;
-        /** Subject categories (e.g., ["cs.AI", "cs.LG"]) */
-        subjects?: string[];
         /** Extractor-specific extra data (AI Services should not depend on this) */
         extra?: Record<string, unknown>;
     };
 
     /** Image URLs (for image context feature) */
     images?: string[];
-    /** Links (for potential future features) */
-    links?: string[];
 
-    // === Extractor Information ===
-    /** Type of extractor used (for debugging/logging only) */
-    extractorType: 'arxiv' | 'wikipedia' | 'generic' | 'readability';
+    /** Links (for potential future features) */
+    links?: string[]; // Currently unused but reserved for future use.
 }
 
 // Type definitions for structured data

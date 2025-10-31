@@ -56,7 +56,5 @@ export function extractPageContentFromDOM(): PageContent {
 
         links: links,
         images: images,
-
-        extractorType: 'generic'
     };
 }

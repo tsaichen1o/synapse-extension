@@ -58,7 +58,5 @@ export function extractPageContentWithReadability(): PageContent | null {
 
         images: [...new Set(images)],
         links: [...new Set(links)],
-
-        extractorType: 'readability'
     };
 }

@@ -49,10 +49,10 @@ export function extractArxivAbstract(doc: Document): PageContent | null {
             tags,
             description: abstract,
             publishDate: submissionHistory.submittedDate,
-            subjects: metadata.subjects,
             extra: {
                 arxivId,
                 doi,
+                subjects: metadata.subjects,
                 comments: metadata.comments,
                 mscClass: metadata.mscClass,
                 acmClass: metadata.acmClass,
@@ -66,8 +66,6 @@ export function extractArxivAbstract(doc: Document): PageContent | null {
             `https://arxiv.org/pdf/${arxivId}`,
             `https://arxiv.org/html/${arxivId}`
         ],
-
-        extractorType: 'arxiv'
     };
 }
 

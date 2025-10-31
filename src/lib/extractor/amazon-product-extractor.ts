@@ -227,7 +227,6 @@ export function extractAmazonProduct(doc: Document): PageContent | null {
         },
         images: [...new Set(images)],
         links: [], // Product pages don't typically have many relevant external links
-        extractorType: 'generic' // Using 'generic' as the base type
     };
     console.log(ret);
     return ret;
