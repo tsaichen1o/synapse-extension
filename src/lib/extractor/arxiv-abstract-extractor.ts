@@ -35,17 +35,12 @@ export function extractArxivAbstract(doc: Document): PageContent | null {
     const doi = extractDOI(doc);
     const submissionHistory = extractSubmissionHistory(doc);
 
-    // For abstract pages, the main content is just the abstract
-    const mainContent = abstract;
-
     // Extract tags from subjects
     const tags = metadata.subjects || [];
 
     return {
         title,
         url: window.location.href,
-        abstract,
-        mainContent,
         fullText: `# ${title}\n\n## Authors\n${authors.join(', ')}\n\n## Abstract\n${abstract}`,
 
         metadata: {

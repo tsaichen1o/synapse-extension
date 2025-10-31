@@ -20,7 +20,7 @@ import { ContentTypeClassifierPrompts } from './prompts';
  * - Falls back gracefully to extractor hint on error
  */
 export class ContentTypeClassifierService {
-    constructor(private ai: AI) {}
+    constructor(private ai: AI) { }
 
     /**
      * Classify content type using AI analysis
@@ -77,13 +77,14 @@ export class ContentTypeClassifierService {
     private prepareContentPreview(pageContent: PageContent): string {
         const MAX_PREVIEW_LENGTH = 1000;
 
-        // Prefer abstract if available (research papers)
-        if (pageContent.abstract && pageContent.abstract.length > 50) {
-            return pageContent.abstract.slice(0, MAX_PREVIEW_LENGTH);
+        // Prefer metadata description if available (usually concise summary)
+        const description = pageContent.metadata.description;
+        if (description && description.length > 50) {
+            return description.slice(0, MAX_PREVIEW_LENGTH);
         }
 
-        // Use mainContent
-        const content = pageContent.mainContent || pageContent.fullText || '';
+        // Use fullText
+        const content = pageContent.fullText || '';
         return content.slice(0, MAX_PREVIEW_LENGTH);
     }
 
@@ -123,7 +124,7 @@ export class ContentTypeClassifierService {
             'review',
             'generic'
         ];
-        
+
         return validTypes.includes(type as ContentType);
     }
 }

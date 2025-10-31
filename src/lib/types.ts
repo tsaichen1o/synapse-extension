@@ -166,11 +166,7 @@ export interface PageContent {
     url: string;
 
     // === Main Content ===
-    /** Abstract or summary (if available) */
-    abstract?: string;
-    /** Main content formatted as markdown */
-    mainContent: string;
-    /** Original full text (for reference) */
+    /** Canonical full text (markdown or plain text) */
     fullText: string;
 
     // === Standardized Metadata ===
@@ -201,7 +197,6 @@ export interface PageContent {
         extra?: Record<string, unknown>;
     };
 
-    // === Optional Fields ===
     /** Image URLs (for image context feature) */
     images?: string[];
     /** Links (for potential future features) */

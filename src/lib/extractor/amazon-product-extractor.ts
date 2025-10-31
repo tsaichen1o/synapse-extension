@@ -202,14 +202,12 @@ export function extractAmazonProduct(doc: Document): PageContent | null {
         ...Object.entries(specs).map(([key, value]) => `${key}: ${value}`),
     ];
 
-    const mainContent = contentParts.filter(Boolean).join('\n');
+    const fullText = contentParts.filter(Boolean).join('\n');
 
     const ret: PageContent = {
         title,
         url: doc.location.href.split('?')[0], // Remove query parameters
-        abstract: features.length > 0 ? features[0] : undefined,
-        mainContent,
-        fullText: mainContent,
+        fullText,
         metadata: {
             description: description || features.join(' '),
             contentType: 'product',

@@ -46,8 +46,6 @@ export function extractArxivPaper(doc: Document): PageContent | null {
     return {
         title,
         url: window.location.href,
-        abstract,
-        mainContent,
         fullText: abstract + '\n\n' + mainContent,
 
         metadata: {

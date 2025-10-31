@@ -48,14 +48,12 @@ export function extractPageContentWithReadability(): PageContent | null {
     return {
         title: article.title || originalTitle,
         url: "", // Filled by the caller
-        abstract: article.excerpt || undefined,
-        mainContent: article.textContent || "",
         fullText: article.textContent || "",
 
         metadata: {
             description: article.excerpt || metaDescription || undefined,
             contentType,
-            tags: headings ,
+            tags: headings,
         },
 
         images: [...new Set(images)],

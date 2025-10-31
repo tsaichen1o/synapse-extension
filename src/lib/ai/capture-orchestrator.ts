@@ -110,7 +110,7 @@ export class CaptureOrchestrator {
         callbacks?: CaptureProgressCallbacks
     ): Promise<PageContent> {
         try {
-            const detectionSource = (pageContent.fullText || pageContent.mainContent || '').trim();
+            const detectionSource = (pageContent.fullText || pageContent.metadata.description || '').trim();
             if (!detectionSource) {
                 return pageContent;
             }
@@ -149,10 +149,9 @@ export class CaptureOrchestrator {
                 return await this.ai.translateStreaming(text, translationOptions);
             };
 
-            const [translatedAbstract, translatedMainContent, translatedFullText] = await Promise.all([
-                translateText(pageContent.abstract),
-                translateText(pageContent.mainContent),
+            const [translatedFullText, translatedDescription] = await Promise.all([
                 translateText(pageContent.fullText),
+                translateText(pageContent.metadata.description),
             ]);
 
             // Notify UI about translation completion
@@ -163,11 +162,10 @@ export class CaptureOrchestrator {
             // Return translated content with metadata
             return {
                 ...pageContent,
-                abstract: translatedAbstract ?? pageContent.abstract,
-                mainContent: translatedMainContent ?? pageContent.mainContent,
                 fullText: translatedFullText ?? pageContent.fullText,
                 metadata: {
                     ...pageContent.metadata,
+                    description: translatedDescription ?? pageContent.metadata.description,
                     extra: {
                         ...pageContent.metadata.extra,
                         originalLanguage: topResult.detectedLanguage,

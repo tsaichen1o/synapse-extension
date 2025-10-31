@@ -13,7 +13,7 @@ import { CondensePrompts } from './prompts';
  * 4. Producing optimized CondensedPageContent structure
  * 
  * ALL CONTENT TYPES USE THE SAME PIPELINE:
- * - Uses standardized PageContent.mainContent (already formatted by extractors)
+ * - Uses standardized PageContent.fullText (already formatted by extractors)
  * - No special handling for different extractors - they all output the same format
  * - Adapts processing based on contentType metadata, not extractor type
  * 
@@ -58,8 +58,8 @@ export class CondenseService {
         console.log("🔄 Starting iterative content condensing process...");
         console.log(`📦 Content type: ${pageContent.metadata.contentType}, Extractor: ${pageContent.extractorType}`);
 
-        // Use standardized mainContent (already formatted by extractors)
-        const rawContent = pageContent.mainContent || pageContent.abstract || pageContent.fullText || '';
+        // Use standardized fullText (already formatted by extractors)
+        const rawContent = pageContent.fullText || pageContent.metadata.description || '';
         const originalLength = rawContent.length;
 
         console.log(`📏 Original content length: ${originalLength} chars`);
@@ -76,12 +76,12 @@ export class CondenseService {
 
             // Step 3: Process chunks iteratively to condense
             console.log("🔄 Step 3: Processing chunks iteratively...");
-            
+
             // Calculate total steps upfront for consistent progress reporting
             // For small content: 1 (refine) + 1 (title) = 2 steps
             // For large content: 1 (init) + chunks.length (process) + 1 (convert) + 1 (title)
             const totalSteps = chunks.length <= 1 ? 2 : chunks.length + 3;
-            
+
             const condensedContent = await this.processChunksIteratively(
                 chunks,
                 contentType,

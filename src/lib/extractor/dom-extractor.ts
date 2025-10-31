@@ -46,8 +46,6 @@ export function extractPageContentFromDOM(): PageContent {
     return {
         title,
         url: window.location.href,
-        abstract: undefined,
-        mainContent: shortContent || fullText,
         fullText,
 
         metadata: {
